@@ -1,0 +1,7 @@
+code/build_build/
+code/build_output/
+code/optimize/ipch/
+*.opensdf
+*.sdf
+*.suo
+*.user
