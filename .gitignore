@@ -5,3 +5,5 @@ code/optimize/ipch/
 *.sdf
 *.suo
 *.user
+code/optimize/optimize.VC.VC.opendb
+code/optimize/optimize.VC.db
