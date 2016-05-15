@@ -195,6 +195,7 @@
     <ClInclude Include="GO_StatusEffectComponent.h" />
     <ClInclude Include="GO_TaskScheduler.h" />
     <ClInclude Include="GO_Thread.h" />
+    <ClInclude Include="GO_ThreadSafeQueue.h" />
     <ClInclude Include="GO_UniformThreadGroup.h" />
     <ClInclude Include="GO_World.h" />
     <ClInclude Include="StableHeaders.h" />

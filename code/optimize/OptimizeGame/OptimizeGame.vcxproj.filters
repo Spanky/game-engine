@@ -43,6 +43,9 @@
     <Filter Include="Gameplay\Systems\Propagation">
       <UniqueIdentifier>{bccce07c-ea06-45bc-beb2-5a2fd4fb080a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Containers">
+      <UniqueIdentifier>{1bcb1b79-51ca-496f-bcf2-4bda927b0c1e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -157,6 +160,9 @@
     </ClInclude>
     <ClInclude Include="GO_UniformThreadGroup.h">
       <Filter>Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ThreadSafeQueue.h">
+      <Filter>Containers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
