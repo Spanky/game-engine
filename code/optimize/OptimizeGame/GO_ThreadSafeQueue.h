@@ -85,7 +85,7 @@ namespace GO
 				return std::unique_ptr<Node>();
 			}
 
-			std::move(myHead->myData, aValue);
+			aValue = std::move(*myHead->myData.get());
 			return PopHeadUnlocked();
 		}
 
@@ -140,7 +140,7 @@ namespace GO
 	bool ThreadSafeQueue<T>::TryPop(T& aValue)
 	{
 		const std::unique_ptr<Node> oldHead = TryPopHead(aValue);
-		return oldHead;
+		return oldHead.get() != nullptr;
 	}
 
 	template<typename T>

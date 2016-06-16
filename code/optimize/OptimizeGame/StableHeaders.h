@@ -25,6 +25,8 @@
 #include <vector>
 #include <random>
 
+#include <functional>
+
 
 // ----------------------------------------------------------------------------
 // Platform Library

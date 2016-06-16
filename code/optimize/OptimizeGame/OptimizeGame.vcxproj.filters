@@ -46,6 +46,9 @@
     <Filter Include="Containers">
       <UniqueIdentifier>{1bcb1b79-51ca-496f-bcf2-4bda927b0c1e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Threading\Thread Pool">
+      <UniqueIdentifier>{e64d1dd0-468f-4393-ba59-6f3a7163eb80}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -101,6 +104,9 @@
     </ClCompile>
     <ClCompile Include="GO_UniformThreadGroup.cpp">
       <Filter>Threading</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_ThreadPool.cpp">
+      <Filter>Threading\Thread Pool</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -163,6 +169,9 @@
     </ClInclude>
     <ClInclude Include="GO_ThreadSafeQueue.h">
       <Filter>Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ThreadPool.h">
+      <Filter>Threading\Thread Pool</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

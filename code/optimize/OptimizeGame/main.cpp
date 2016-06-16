@@ -7,6 +7,7 @@
 #include "GO_GameInstance.h"
 #include "GO_Gameworks.h"
 #include "GO_HacksGlobalResources.h"
+#include "GO_ThreadPool.h"
 
 #include "GO_StatusEffectComponent.h"
 #include "GO_SpriteComponent.h"
@@ -134,6 +135,38 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 {
 	ourGameworks.myDataDirectory = "..\\..\\..\\data\\";
 	sf::err().rdbuf(ourGameworks.mySFMLOutput.rdbuf());
+
+
+
+	while(true)
+	{
+		struct Counters
+		{
+			std::atomic_int counter;
+		};
+		Counters counter[20] = { 0 };
+
+		const int NumJobsSubmitted = 200000;
+		const int HardwareConcurrency = std::thread::hardware_concurrency();
+
+		{
+			GO::ThreadPool threadPool;
+			for (int i = 0; i < NumJobsSubmitted; i++)
+			{
+				threadPool.Submit([&counter, &HardwareConcurrency, i]() { counter[i % HardwareConcurrency].counter.fetch_add(1); });
+			}
+		}
+
+
+		int resultCounter = 0;
+		for (size_t i = 0; i < 20; i++)
+		{
+			resultCounter += counter[i].counter.load();
+		}
+		GO_ASSERT(resultCounter == NumJobsSubmitted, "Number of jobs processed was not the same as the number of jobs submitted");
+	}
+
+	
 
 
 	sf::RenderWindow window(sf::VideoMode(1280, 720), "SFML works!", sf::Style::Close | sf::Style::Titlebar);

@@ -170,6 +170,7 @@
     <ClCompile Include="GO_StatusEffectComponent.cpp" />
     <ClCompile Include="GO_TaskScheduler.cpp" />
     <ClCompile Include="GO_Thread.cpp" />
+    <ClCompile Include="GO_ThreadPool.cpp" />
     <ClCompile Include="GO_UniformThreadGroup.cpp" />
     <ClCompile Include="GO_World.cpp" />
     <ClCompile Include="main.cpp" />
@@ -195,6 +196,7 @@
     <ClInclude Include="GO_StatusEffectComponent.h" />
     <ClInclude Include="GO_TaskScheduler.h" />
     <ClInclude Include="GO_Thread.h" />
+    <ClInclude Include="GO_ThreadPool.h" />
     <ClInclude Include="GO_ThreadSafeQueue.h" />
     <ClInclude Include="GO_UniformThreadGroup.h" />
     <ClInclude Include="GO_World.h" />
