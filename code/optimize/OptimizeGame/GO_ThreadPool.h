@@ -1,33 +1,10 @@
 #pragma once
 
 #include "GO_ThreadSafeQueue.h"
+#include "GO_ThreadJoiner.h"
 
 namespace GO
 {
-	class ThreadJoiner
-	{
-	public:
-		explicit ThreadJoiner(std::vector<std::thread>& someThreads)
-			: myThreads(someThreads)
-		{
-		}
-
-		~ThreadJoiner()
-		{
-			for (size_t i = 0; i < myThreads.size(); i++)
-			{
-				if (myThreads[i].joinable())
-				{
-					myThreads[i].join();
-				}
-			}
-		}
-
-	private:
-		std::vector<std::thread>& myThreads;
-	};
-
-
 	class ThreadPool
 	{
 	public:
@@ -35,9 +12,16 @@ namespace GO
 		~ThreadPool();
 
 		template<typename FunctionType>
-		void Submit(FunctionType aFunction)
+		std::future<typename std::result_of<FunctionType()>::type> Submit(FunctionType aFunction)
 		{
-			myWorkQueue.Push(std::function<void()>(aFunction));
+			typedef typename std::result_of<FunctionType()>::type result_type;
+
+			std::packaged_task<result_type()> task(std::move(aFunction));
+			std::future<result_type> res(task.get_future());
+
+			myWorkQueue.Push(std::move(task));
+
+			return res;
 		}
 
 	private:
@@ -45,7 +29,7 @@ namespace GO
 
 	private:
 		std::atomic_bool myIsDone;
-		ThreadSafeQueue<std::function<void()>> myWorkQueue;
+		ThreadSafeQueue<std::packaged_task<int()>> myWorkQueue;
 		std::vector<std::thread> myThreads;
 		ThreadJoiner myThreadJoiner;
 	};

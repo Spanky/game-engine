@@ -131,43 +131,59 @@ void GO_FrameTaskProcessor::operator()()
 }
 
 
+void TestThreadPool()
+{
+	//int numTimesRan = 0;
+	//while(true)
+	//{
+	//	struct Counters
+	//	{
+	//		std::atomic_int counter;
+	//	};
+	//	//Counters counter[20] = { 0 };
+	//	std::atomic_int counter = 0;
+
+	//	const int NumJobsSubmitted = 200;
+	//	//const int HardwareConcurrency = std::thread::hardware_concurrency();
+
+	//	{
+	//		GO::ThreadPool threadPool;
+
+	//		std::vector<std::future<int>> futures(NumJobsSubmitted);
+
+	//		for (int i = 0; i < NumJobsSubmitted; ++i)
+	//		{
+	//			std::future<int> result = threadPool.Submit([&counter]() -> int
+	//			{
+	//				return counter.fetch_add(1);
+	//			});
+
+	//			futures[i] = std::move(result);
+	//		}
+
+	//		std::for_each(futures.begin(), futures.end(), [](std::future<int>& aFuture)
+	//		{
+	//			aFuture.get();
+	//		});
+	//	}
+
+
+	//	int resultCounter = counter.load();
+	//	//for (size_t i = 0; i < 20; i++)
+	//	//{
+	//	//	resultCounter += counter[i].counter.load();
+	//	//}
+	//	GO_ASSERT(resultCounter == NumJobsSubmitted, "Number of jobs processed was not the same as the number of jobs submitted");
+
+	//	numTimesRan++;
+	//}
+}
+
+
 int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
 	ourGameworks.myDataDirectory = "..\\..\\..\\data\\";
 	sf::err().rdbuf(ourGameworks.mySFMLOutput.rdbuf());
-
-
-
-	while(true)
-	{
-		struct Counters
-		{
-			std::atomic_int counter;
-		};
-		Counters counter[20] = { 0 };
-
-		const int NumJobsSubmitted = 200000;
-		const int HardwareConcurrency = std::thread::hardware_concurrency();
-
-		{
-			GO::ThreadPool threadPool;
-			for (int i = 0; i < NumJobsSubmitted; i++)
-			{
-				threadPool.Submit([&counter, &HardwareConcurrency, i]() { counter[i % HardwareConcurrency].counter.fetch_add(1); });
-			}
-		}
-
-
-		int resultCounter = 0;
-		for (size_t i = 0; i < 20; i++)
-		{
-			resultCounter += counter[i].counter.load();
-		}
-		GO_ASSERT(resultCounter == NumJobsSubmitted, "Number of jobs processed was not the same as the number of jobs submitted");
-	}
-
-	
-
 
 	sf::RenderWindow window(sf::VideoMode(1280, 720), "SFML works!", sf::Style::Close | sf::Style::Titlebar);
 	//window.setVerticalSyncEnabled(true);

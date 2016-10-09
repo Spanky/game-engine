@@ -173,5 +173,8 @@
     <ClInclude Include="GO_ThreadPool.h">
       <Filter>Threading\Thread Pool</Filter>
     </ClInclude>
+    <ClInclude Include="GO_ThreadJoiner.h">
+      <Filter>Threading</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

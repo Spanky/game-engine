@@ -1,6 +1,8 @@
 #include "StableHeaders.h"
 #include "GO_ThreadPool.h"
 
+#include <memory>
+
 namespace GO
 {
 	ThreadPool::ThreadPool()
@@ -24,7 +26,7 @@ namespace GO
 	{
 		while(!myIsDone)
 		{
-			std::function<void()> task;
+			std::packaged_task<int()> task;
 			if (myWorkQueue.TryPop(task))
 			{
 				task();
@@ -36,7 +38,7 @@ namespace GO
 		}
 
 		// Complete remaining tasks that are still in the queue
-		std::function<void()> task;
+		std::packaged_task<int()> task;
 		while (myWorkQueue.TryPop(task))
 		{
 			task();
