@@ -49,6 +49,9 @@
     <Filter Include="Threading\Thread Pool">
       <UniqueIdentifier>{e64d1dd0-468f-4393-ba59-6f3a7163eb80}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Profiling">
+      <UniqueIdentifier>{3e4d1adc-df0c-449f-aeb9-5257dc3adf5d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -107,6 +110,9 @@
     </ClCompile>
     <ClCompile Include="GO_ThreadPool.cpp">
       <Filter>Threading\Thread Pool</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_Profiler.cpp">
+      <Filter>Profiling</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -175,6 +181,9 @@
     </ClInclude>
     <ClInclude Include="GO_ThreadJoiner.h">
       <Filter>Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_Profiler.h">
+      <Filter>Profiling</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

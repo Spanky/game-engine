@@ -162,6 +162,7 @@
     <ClCompile Include="GO_EntityComponent.cpp" />
     <ClCompile Include="GO_GameInstance.cpp" />
     <ClCompile Include="GO_HacksGlobalResources.cpp" />
+    <ClCompile Include="GO_Profiler.cpp" />
     <ClCompile Include="GO_PropagationCell.cpp" />
     <ClCompile Include="GO_PropagationMatrix.cpp" />
     <ClCompile Include="GO_PropagationRow.cpp" />
@@ -188,6 +189,7 @@
     <ClInclude Include="GO_GameInstance.h" />
     <ClInclude Include="GO_Gameworks.h" />
     <ClInclude Include="GO_HacksGlobalResources.h" />
+    <ClInclude Include="GO_Profiler.h" />
     <ClInclude Include="GO_PropagationCell.h" />
     <ClInclude Include="GO_PropagationMatrix.h" />
     <ClInclude Include="GO_PropagationRow.h" />

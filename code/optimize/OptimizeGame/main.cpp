@@ -8,6 +8,13 @@
 #include "GO_Gameworks.h"
 #include "GO_HacksGlobalResources.h"
 #include "GO_ThreadPool.h"
+#include "GO_Profiler.h"
+
+static_assert(sizeof(long long) == 8, "");
+
+static const int CacheLineSizeInBytes = 64;
+static_assert(sizeof(GO_APIProfiler::ThreadInfo) <= CacheLineSizeInBytes, "ThreadInfo needs to fit in a single cache line");
+static_assert((CacheLineSizeInBytes % sizeof(GO_APIProfiler::ThreadInfo)) == 0, "ThreadInfo needs to fit evenly in a cache line");
 
 #include "GO_StatusEffectComponent.h"
 #include "GO_SpriteComponent.h"
@@ -179,6 +186,7 @@ void TestThreadPool()
 	//}
 }
 
+DEFINE_API_PROFILER(theMainLoopTag);
 
 int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
@@ -359,7 +367,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 		window.clear();
 
-		gameInstance.getTaskScheduler().update();
+		{
+			API_PROFILER(theMainLoopTag);
+			gameInstance.getTaskScheduler().update();
+		}
 
 
 		if (canMoveRight)
