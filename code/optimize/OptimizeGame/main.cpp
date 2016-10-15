@@ -10,11 +10,6 @@
 #include "GO_ThreadPool.h"
 #include "GO_Profiler.h"
 
-static_assert(sizeof(long long) == 8, "");
-
-static const int CacheLineSizeInBytes = 64;
-static_assert(sizeof(GO_APIProfiler::ThreadInfo) <= CacheLineSizeInBytes, "ThreadInfo needs to fit in a single cache line");
-static_assert((CacheLineSizeInBytes % sizeof(GO_APIProfiler::ThreadInfo)) == 0, "ThreadInfo needs to fit evenly in a cache line");
 
 #include "GO_StatusEffectComponent.h"
 #include "GO_SpriteComponent.h"
@@ -186,8 +181,6 @@ void TestThreadPool()
 	//}
 }
 
-DEFINE_API_PROFILER(theMainLoopTag);
-
 int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
 	ourGameworks.myDataDirectory = "..\\..\\..\\data\\";
@@ -349,26 +342,38 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	delete[] frameProcessors;
 	frameProcessors = nullptr;
 
+#if PROFILER_ENABLED
+	GO_APIProfiler testProfiler;
+#endif	// #if PROFILER_ENABLED
+
 	while(window.isOpen())
 	{
+		PROFILER_BEGIN_FRAME(testProfiler);
+		
 		sf::Time deltaTime = frameTimer.restart();
 
 		double elapsedTime = static_cast<double>(deltaTime.asMicroseconds()) / 1000.0;
 
-
-		sf::Event event;
-		while(window.pollEvent(event))
 		{
-			if(event.type == sf::Event::Closed)
+			PROFILER_SCOPED(&testProfiler, "Windows Loop");
+			sf::Event event;
+			while (window.pollEvent(event))
 			{
-				window.close();
+				if (event.type == sf::Event::Closed)
+				{
+					window.close();
+				}
 			}
 		}
 
-		window.clear();
+		{
+			PROFILER_SCOPED(&testProfiler, "Clear Window");
+			window.clear();
+		}
+
 
 		{
-			API_PROFILER(theMainLoopTag);
+			PROFILER_SCOPED(&testProfiler, "Task Scheduler");
 			gameInstance.getTaskScheduler().update();
 		}
 
@@ -451,7 +456,12 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		//propMatrix.debugDraw();
 
 		sf::Clock propagationTimer;
-		propMatrix.updateCells();
+
+		{
+			PROFILER_SCOPED(&testProfiler, "Propagation");
+			propMatrix.updateCells();
+		}
+
 		sf::Time propagationUpdateTime = propagationTimer.getElapsedTime();
 		drawTimer(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), propagationUpdateTime, sf::Vector2f(500.0f, 500.0f));
 
@@ -459,7 +469,12 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		drawFpsCounter(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), deltaTime);
 		//drawThreadId(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont());
 		
-		window.display();
+		{
+			PROFILER_SCOPED(&testProfiler, "Rendering");
+			window.display();
+		}
+
+		PROFILER_END_FRAME(testProfiler);
 	}
 
 	delete heapPropMatrix;

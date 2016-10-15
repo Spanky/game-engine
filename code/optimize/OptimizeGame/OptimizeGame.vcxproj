@@ -144,6 +144,9 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\libs\SFML-2.3.2-windows-vc14-64-bit\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>StableHeaders.h</PrecompiledHeaderFile>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <OmitFramePointers>true</OmitFramePointers>
+      <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -162,7 +165,10 @@
     <ClCompile Include="GO_EntityComponent.cpp" />
     <ClCompile Include="GO_GameInstance.cpp" />
     <ClCompile Include="GO_HacksGlobalResources.cpp" />
-    <ClCompile Include="GO_Profiler.cpp" />
+    <ClCompile Include="GO_Profiler.cpp">
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AssemblyAndSourceCode</AssemblerOutput>
+      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AssemblyAndSourceCode</AssemblerOutput>
+    </ClCompile>
     <ClCompile Include="GO_PropagationCell.cpp" />
     <ClCompile Include="GO_PropagationMatrix.cpp" />
     <ClCompile Include="GO_PropagationRow.cpp" />
