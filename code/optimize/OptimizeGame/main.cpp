@@ -388,6 +388,10 @@ void RenderThreadEvents(const std::vector<ProfilerThreadEvent>& someThreadEvents
 	for(size_t lookupIndex = 0; lookupIndex < threadSpecificInfos.size(); lookupIndex++)
 	{
 		ThreadSpecificEventInfo& threadSpecific = threadSpecificInfos[lookupIndex];
+		if(threadSpecific.myLastThreadTag <= 1)
+		{
+			continue;
+		}
 
 		//	// Since we are only storing the starting time of each event, we can't draw it until we encounter
 		//	// the next event on the time line.
