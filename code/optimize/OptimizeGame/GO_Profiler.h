@@ -4,7 +4,40 @@
 
 #if PROFILER_ENABLED
 
-struct ProfilerNode;
+unsigned char GetCurrentThreadIndex();
+
+struct ProfilerNode
+{
+	// 0
+	const char* myName;
+
+	// 8
+	ProfilerNode* myFirstChild;
+	ProfilerNode* mySibling;
+	ProfilerNode* myParent;
+
+	// 32
+	long long myAccumulator;
+	long long myHitCount;
+
+	// 48
+	long long myCurrentStartTime;
+	unsigned int myColor;
+
+	// 60
+	unsigned int myPadding;
+	
+	// 64
+};
+
+
+struct ProfilerThreadEvent
+{
+	long long myStartTime;
+
+	unsigned int myThreadIndex;
+	unsigned char myThreadTag;
+};
 
 // Based on the work of Jeff Phreshing here
 //		http://preshing.com/20111203/a-c-profiling-module-for-multithreaded-apis/
@@ -16,38 +49,61 @@ public:
 	void BeginFrame();
 	void EndFrame();
 
-	void BeginProfile(const char* aName);
+	void BeginProfile(const char* aName, unsigned int aColor);
 	void EndProfile(const char* aName);
+
+	void PushThreadEvent(unsigned char aThreadTag);
+
+	// TODO: These methods should not expose internals as to how they are implemented
+	ProfilerNode* GetPreviousFrameRootNode()
+	{
+		return myPreviousFrameRootNode;
+	}
+
+	const std::vector<ProfilerThreadEvent>& GetPreviousFrameThreadEvents()
+	{
+		return myPreviousThreadEvents;
+	}
+
+	long long GetPreviousFrameStartTime() const
+	{
+		return myPreviousFrameStartTime;
+	}
+
+	static float TicksToMilliseconds(long long aTickCount);
 
 private:
 	ProfilerNode* GetNewNode();
-	
-	void ReleaseAllProfilerNodes();
 	void ReleaseNodeHierarchy(ProfilerNode* aProfilerNode);
 
-	void Flush(long long anEnd);
-	void PrintProfilerHierarchy(ProfilerNode* aRootNode, double anInterval, int aLevel);
+	void StoreFrameInHistory();
 
 
 private:
 	static double ourFrequency;
-	static long long ourReportInterval;
 
 	long long myStart;
-	long long myLastFlushedOutputTime;
+	long long myPreviousFrameStartTime;
+
+	long long myCurrentFrameStartTime;
+
 	long long myProfilerOverhead;
 	ProfilerNode* myCurrentNode;
+	ProfilerNode* myPreviousFrameRootNode;
+
+	std::vector<ProfilerThreadEvent> myThreadEvents;
+	std::vector<ProfilerThreadEvent> myPreviousThreadEvents;
 };
 
 
 class GO_APIProfileInstance
 {
 public:
-	GO_APIProfileInstance(GO_APIProfiler* aProfiler, const char* aName)
+	GO_APIProfileInstance(GO_APIProfiler* aProfiler, const char* aName, unsigned int aColor)
 		: myProfiler(aProfiler)
 		, myName(aName)
 	{
-		myProfiler->BeginProfile(myName);
+		myProfiler->BeginProfile(myName, aColor);
 	}
 
 	~GO_APIProfileInstance()
@@ -69,14 +125,14 @@ private:
 #define PROFILER_BEGIN_FRAME(profiler)		(profiler).BeginFrame();
 #define PROFILER_END_FRAME(profiler)		(profiler).EndFrame();
 
-#define PROFILER_SCOPED(profiler, name)		GO_APIProfileInstance TOKENPASTE(__GO_APIProfiler_, __LINE__)(profiler, name);
+#define PROFILER_SCOPED(profiler, name, color)		GO_APIProfileInstance TOKENPASTE(__GO_APIProfiler_, __LINE__)(profiler, name, color);
 
 #else		// #if PROFILER_ENABLED
 
 #define PROFILER_BEGIN_FRAME(profiler)
 #define PROFILER_END_FRAME(profiler)
 
-#define PROFILER_SCOPED(profiler, name)
+#define PROFILER_SCOPED(profiler, name, color)
 
 
 #endif	// PROFILER_ENABLED

@@ -3,12 +3,14 @@
 #include "GO_ThreadSafeQueue.h"
 #include "GO_ThreadJoiner.h"
 
+class GO_APIProfiler;
+
 namespace GO
 {
 	class ThreadPool
 	{
 	public:
-		ThreadPool();
+		ThreadPool(GO_APIProfiler* aProfiler);
 		~ThreadPool();
 
 		template<typename FunctionType>
@@ -32,5 +34,7 @@ namespace GO
 		ThreadSafeQueue<std::packaged_task<int()>> myWorkQueue;
 		std::vector<std::thread> myThreads;
 		ThreadJoiner myThreadJoiner;
+
+		GO_APIProfiler* myProfiler;
 	};
 }

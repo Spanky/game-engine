@@ -1,5 +1,7 @@
 #include "StableHeaders.h"
 
+#include <algorithm>
+
 #include "GO_AssertMutex.h"
 #include "GO_World.h"
 #include "GO_TaskScheduler.h"
@@ -21,6 +23,19 @@
 #include "GO_UniformThreadGroup.h"
 
 const int Int64TextWidth = 20;
+
+const long long ourProfilerMergeTolerance = 1000;
+
+const unsigned char THREAD_TAG_UNKNOWN = 0;
+const unsigned char THREAD_TAG_WAITING = 1;
+
+const unsigned char THREAD_TAG_TASK_SCHEDULER = 2;
+const unsigned char THREAD_TAG_PROPAGATION = 3;
+
+const unsigned char THREAD_TAG_GAME_TASK = 4;
+const unsigned char THREAD_TAG_MAIN_THREAD = 5;
+
+const unsigned char THREAD_TAG_PROFILER_RENDER = 6;
 
 GO::Gameworks ourGameworks;
 
@@ -133,52 +148,293 @@ void GO_FrameTaskProcessor::operator()()
 }
 
 
-void TestThreadPool()
+void LaunchSampleGameThreads(GO::ThreadPool& aThreadPool, GO_APIProfiler& aProfiler)
 {
-	//int numTimesRan = 0;
-	//while(true)
-	//{
-	//	struct Counters
-	//	{
-	//		std::atomic_int counter;
-	//	};
-	//	//Counters counter[20] = { 0 };
-	//	std::atomic_int counter = 0;
+	std::atomic_int counter = 0;
+	const int NumJobsSubmitted = 2000;
 
-	//	const int NumJobsSubmitted = 200;
-	//	//const int HardwareConcurrency = std::thread::hardware_concurrency();
+	{
+		std::vector<std::future<int>> futures(NumJobsSubmitted);
 
-	//	{
-	//		GO::ThreadPool threadPool;
+		for (int i = 0; i < NumJobsSubmitted; ++i)
+		{
+			std::future<int> result = aThreadPool.Submit([&counter, &aProfiler]() -> int
+			{
+				// TODO: The thread tag should be automatically gathered from the same tag as the 'submit' event
+				aProfiler.PushThreadEvent(THREAD_TAG_GAME_TASK);
+				//std::this_thread::sleep_for(std::chrono::nanoseconds(10));
+				return counter.fetch_add(1);
+			});
 
-	//		std::vector<std::future<int>> futures(NumJobsSubmitted);
+			futures[i] = std::move(result);
+		}
 
-	//		for (int i = 0; i < NumJobsSubmitted; ++i)
-	//		{
-	//			std::future<int> result = threadPool.Submit([&counter]() -> int
-	//			{
-	//				return counter.fetch_add(1);
-	//			});
-
-	//			futures[i] = std::move(result);
-	//		}
-
-	//		std::for_each(futures.begin(), futures.end(), [](std::future<int>& aFuture)
-	//		{
-	//			aFuture.get();
-	//		});
-	//	}
+		std::for_each(futures.begin(), futures.end(), [](std::future<int>& aFuture)
+		{
+			aFuture.get();
+		});
+	}
 
 
-	//	int resultCounter = counter.load();
-	//	//for (size_t i = 0; i < 20; i++)
-	//	//{
-	//	//	resultCounter += counter[i].counter.load();
-	//	//}
-	//	GO_ASSERT(resultCounter == NumJobsSubmitted, "Number of jobs processed was not the same as the number of jobs submitted");
+	int resultCounter = counter.load();
+	GO_ASSERT(resultCounter == NumJobsSubmitted, "Number of jobs processed was not the same as the number of jobs submitted");
+}
 
-	//	numTimesRan++;
-	//}
+void RenderProfilerNode(long long aProfiledTime, const float aParentTotalTime, unsigned int aColor, const sf::Vector2f& aRegionSize, sf::Vector2f& aCurrentOffset, sf::RenderWindow& aWindow)
+{
+	const float childTime = GO_APIProfiler::TicksToMilliseconds(aProfiledTime);
+	const float childRectangleWidth = aRegionSize.x * (childTime / aParentTotalTime);
+
+	sf::RectangleShape profilerOutline(sf::Vector2f(childRectangleWidth, aRegionSize.y));
+	profilerOutline.setPosition(sf::Vector2f(aCurrentOffset));
+	aCurrentOffset.x += childRectangleWidth;
+
+	profilerOutline.setFillColor(sf::Color(aColor));
+
+	aWindow.draw(profilerOutline);
+}
+
+void RenderProfilerLevel(ProfilerNode* aLevelParentNode, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
+{
+	const float parentTotalTime = GO_APIProfiler::TicksToMilliseconds(aLevelParentNode->myAccumulator);
+	sf::Vector2f currentOffset = aStartingPosition;
+
+	std::vector<ProfilerNode*> reversedOrderChildren;
+	// Render children nodes
+	ProfilerNode* childNode = aLevelParentNode->myFirstChild;
+	while (childNode)
+	{
+		reversedOrderChildren.push_back(childNode);
+		childNode = childNode->mySibling;
+	}
+
+	while(reversedOrderChildren.size())
+	{
+		ProfilerNode* childNode = reversedOrderChildren.back();
+		reversedOrderChildren.erase(reversedOrderChildren.end() - 1);
+
+		RenderProfilerNode(childNode->myAccumulator, parentTotalTime, childNode->myColor, aRegionSize, currentOffset, aWindow);
+		childNode = childNode->mySibling;
+	}
+
+	// Render a node that is the 'unknown' time that wasn't tracked for this level
+	// Count up the time of the children
+	long long totalTicks = 0;
+	{
+		ProfilerNode* childNode = aLevelParentNode->myFirstChild;
+		while (childNode)
+		{
+			totalTicks += childNode->myAccumulator;
+			childNode = childNode->mySibling;
+		}
+	}
+
+	const long long unknownTime = aLevelParentNode->myAccumulator - totalTicks;
+	const float unknwonRectangleWidth = aRegionSize.x * (unknownTime / parentTotalTime);
+
+	RenderProfilerNode(unknownTime, parentTotalTime, 0xffffffff, aRegionSize, currentOffset, aWindow);
+}
+
+sf::Color locGetThreadTagColor(unsigned char aThreadTag)
+{
+	switch(aThreadTag)
+	{
+	// NOTE: This is the 'unknown' case and we should really be pushing something on here
+	case THREAD_TAG_UNKNOWN:
+		return sf::Color(0xffffffff);
+	case THREAD_TAG_WAITING:
+		return sf::Color(0x00000000);
+	case THREAD_TAG_TASK_SCHEDULER:
+		return sf::Color(0xffff00ff);
+	case THREAD_TAG_PROPAGATION:
+		return sf::Color(0x00ffffff);
+	case THREAD_TAG_GAME_TASK:
+		return sf::Color(0xff0000ff);
+	case THREAD_TAG_MAIN_THREAD:
+		return sf::Color(0x00ff00ff);
+	case THREAD_TAG_PROFILER_RENDER:
+		return sf::Color(0x0000ffff);
+	default:
+		return sf::Color(0xff00ffff);
+	}
+}
+
+void RenderThreadEvents(const std::vector<ProfilerThreadEvent>& someThreadEvents, const long long aFrameStartTime, const float aFrameDuration, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
+{
+	GO_ASSERT(aFrameDuration != 0, "Previous frame must have a duration");
+
+	struct ThreadSpecificEventInfo
+	{
+		long long myLastEventStartTime;
+		unsigned int myThreadIndex;
+		unsigned char myLastThreadTag;
+	};
+
+	std::vector<ThreadSpecificEventInfo> threadSpecificInfos;
+
+	unsigned int numDrawn = 0;
+
+
+	long long mainThreadTime = 0;
+	int numMainThreads = 0;
+	for(int i = someThreadEvents.size() - 1; i >= 0; i--)
+	{
+		// TODO: Hard-coded thread index here
+		if(someThreadEvents[i].myThreadIndex == GetCurrentThreadIndex())
+		{
+			numMainThreads++;
+			if(numMainThreads == 4)
+			{
+				mainThreadTime = someThreadEvents[i].myStartTime;
+				break;
+			}
+		}
+	}
+	GO_ASSERT(mainThreadTime != 0, "Could not locate 4th last main thread event");
+
+	for(const ProfilerThreadEvent& pte : someThreadEvents)
+	{
+		GO_ASSERT(pte.myStartTime >= aFrameStartTime, "Received an event that started before the frame did");
+
+		// As we go over every event, keep track of the threads that we encounter so we know where to put the markers
+		size_t lookupIndex = 0;
+		for(lookupIndex = 0; lookupIndex < threadSpecificInfos.size(); lookupIndex++)
+		{
+			if(threadSpecificInfos[lookupIndex].myThreadIndex == pte.myThreadIndex)
+			{
+				break;
+			}
+		}
+
+		// We couldn't find a thread specific info entry for this thread so we have to create a new one
+		if(lookupIndex == threadSpecificInfos.size())
+		{
+			threadSpecificInfos.push_back(ThreadSpecificEventInfo());
+
+			lookupIndex = threadSpecificInfos.size() - 1;
+
+			ThreadSpecificEventInfo& newThreadInfo = threadSpecificInfos[lookupIndex];
+			newThreadInfo.myThreadIndex = pte.myThreadIndex;
+			newThreadInfo.myLastEventStartTime = aFrameStartTime;
+			newThreadInfo.myLastThreadTag = THREAD_TAG_WAITING;
+		}
+
+		ThreadSpecificEventInfo& threadSpecific = threadSpecificInfos[lookupIndex];
+
+		// Since we are only storing the starting time of each event, we can't draw it until we encounter
+		// the next event on the time line.
+		
+		// Skip elements that are under our tolerance to avoid creating tons of small rectangles. Merge them
+		// into one larger rectangle
+
+		GO_ASSERT(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
+		if( !(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1))
+		{
+			int* test = nullptr;
+			(*test) = 5;
+		}
+
+		// TODO: The start time may be before this frame has actually started.
+		//		 This would indicate an event that was carried forward from the
+		//		 previous frame
+		const long long eventStartTime = std::max<long long>(0, threadSpecific.myLastEventStartTime - aFrameStartTime);
+		const long long eventEndTime = pte.myStartTime - aFrameStartTime;
+
+		const float relativeEventStartTime = GO_APIProfiler::TicksToMilliseconds(eventStartTime);
+		//const float relativeEventEndTime = GO_APIProfiler::TicksToMilliseconds(eventEndTime);
+
+		const long long eventDuration = eventEndTime - eventStartTime;
+		GO_ASSERT(eventDuration >= 0, "The event took 'negative' time");
+
+		// Skip over any that can be merged together
+		if(pte.myThreadTag == threadSpecific.myLastThreadTag &&
+			(pte.myStartTime - threadSpecific.myLastEventStartTime) < ourProfilerMergeTolerance)
+		{
+			continue;
+		}
+
+		sf::Vector2f rectSize;
+		rectSize.x = aRegionSize.x * (GO_APIProfiler::TicksToMilliseconds(eventDuration) / aFrameDuration);
+		rectSize.y = 10.0f;
+
+		sf::Vector2f rectPosition;
+		rectPosition.x = aStartingPosition.x + (aRegionSize.x * (relativeEventStartTime / aFrameDuration));
+		rectPosition.y = aStartingPosition.y + (threadSpecific.myThreadIndex * 15.0f);
+
+		GO_ASSERT(rectPosition.x >= aStartingPosition.x, "The event will be drawn before the timeline");
+		GO_ASSERT(rectSize.x >= 0.0f, "The event will be drawn with negative size");
+		GO_ASSERT(rectPosition.x <= aStartingPosition.x + aRegionSize.x, "Bar goes beyond the bounds given to us");
+
+		sf::RectangleShape profilerOutline(rectSize);
+		profilerOutline.setPosition(rectPosition);
+
+		sf::Color eventColor = locGetThreadTagColor(threadSpecific.myLastThreadTag);
+		profilerOutline.setFillColor(eventColor);
+
+		aWindow.draw(profilerOutline);
+		numDrawn++;
+
+		threadSpecific.myLastEventStartTime = pte.myStartTime;
+		threadSpecific.myLastThreadTag = pte.myThreadTag;
+	}
+
+	if(numDrawn == 4123212313)
+	{
+		int* temp = nullptr;
+		(*temp) = 5;
+	}
+
+	// TODO: Render the last events for each of the threads
+	for(size_t lookupIndex = 0; lookupIndex < threadSpecificInfos.size(); lookupIndex++)
+	{
+		ThreadSpecificEventInfo& threadSpecific = threadSpecificInfos[lookupIndex];
+
+		//	// Since we are only storing the starting time of each event, we can't draw it until we encounter
+		//	// the next event on the time line.
+
+		const float endFrameTime = GO_APIProfiler::TicksToMilliseconds(aFrameStartTime) + aFrameDuration;
+		const float eventDuration = endFrameTime - GO_APIProfiler::TicksToMilliseconds(threadSpecific.myLastEventStartTime);
+
+		// TODO: The start time may be before this frame has actually started.
+		//		 This would indicate an event that was carried forward from the
+		//		 previous frame
+		//const long long eventStartTime = std::max<long long>(0, threadSpecific.myLastEventStartTime - aFrameStartTime);
+		//const long long eventEndTime =  - aFrameStartTime;
+
+		const float relativeEventStartTime = GO_APIProfiler::TicksToMilliseconds(threadSpecific.myLastEventStartTime);
+		//const float relativeEventEndTime = GO_APIProfiler::TicksToMilliseconds(eventEndTime);
+
+		//const long long eventDuration = eventEndTime - eventStartTime;
+		GO_ASSERT(eventDuration >= 0, "The event took 'negative' time");
+
+		// Skip over any that can be merged together
+		//if (pte.myThreadTag == threadSpecific.myLastThreadTag &&
+		//	(pte.myStartTime - threadSpecific.myLastEventStartTime) < ourProfilerMergeTolerance)
+		//{
+		//	continue;
+		//}
+
+		sf::Vector2f rectSize;
+		rectSize.x = aRegionSize.x * (eventDuration / aFrameDuration);
+		rectSize.y = 10.0f;
+
+		sf::Vector2f rectPosition;
+		rectPosition.x = aStartingPosition.x + (aRegionSize.x * (relativeEventStartTime / aFrameDuration));
+		rectPosition.y = aStartingPosition.y + (threadSpecific.myThreadIndex * 15.0f);
+
+		GO_ASSERT(rectPosition.x >= aStartingPosition.x, "The event will be drawn before the timeline");
+		GO_ASSERT(rectSize.x >= 0.0f, "The event will be drawn with negative size");
+		GO_ASSERT(rectPosition.x <= aStartingPosition.x + aRegionSize.x, "Bar goes beyond the bounds given to us");
+
+		sf::RectangleShape profilerOutline(rectSize);
+		profilerOutline.setPosition(rectPosition);
+
+		sf::Color eventColor = locGetThreadTagColor(threadSpecific.myLastThreadTag);
+		profilerOutline.setFillColor(eventColor);
+
+		aWindow.draw(profilerOutline);
+		numDrawn++;
+	}
 }
 
 int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -346,16 +602,20 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	GO_APIProfiler testProfiler;
 #endif	// #if PROFILER_ENABLED
 
+	GO::ThreadPool threadPool(&testProfiler);
+
 	while(window.isOpen())
 	{
 		PROFILER_BEGIN_FRAME(testProfiler);
+
+		testProfiler.PushThreadEvent(THREAD_TAG_MAIN_THREAD);
 		
 		sf::Time deltaTime = frameTimer.restart();
 
 		double elapsedTime = static_cast<double>(deltaTime.asMicroseconds()) / 1000.0;
 
 		{
-			PROFILER_SCOPED(&testProfiler, "Windows Loop");
+			PROFILER_SCOPED(&testProfiler, "Windows Loop", 0x0000ffff);
 			sf::Event event;
 			while (window.pollEvent(event))
 			{
@@ -367,14 +627,31 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		}
 
 		{
-			PROFILER_SCOPED(&testProfiler, "Clear Window");
+			PROFILER_SCOPED(&testProfiler, "Clear Window", 0x00ff00ff);
 			window.clear();
 		}
 
 
 		{
-			PROFILER_SCOPED(&testProfiler, "Task Scheduler");
-			gameInstance.getTaskScheduler().update();
+			window.setActive(false);
+
+			std::future<int> result = threadPool.Submit([&testProfiler, &gameInstance, &window]() -> int
+			{
+				testProfiler.PushThreadEvent(THREAD_TAG_TASK_SCHEDULER);
+				
+				//PROFILER_SCOPED(&testProfiler, "Task Scheduler");
+				window.setActive(true);
+				gameInstance.getTaskScheduler().update();
+				window.setActive(false);
+
+				return 1;
+			});
+
+			testProfiler.PushThreadEvent(THREAD_TAG_WAITING);
+			result.get();
+			testProfiler.PushThreadEvent(THREAD_TAG_MAIN_THREAD);
+
+			window.setActive(true);
 		}
 
 
@@ -458,8 +735,19 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		sf::Clock propagationTimer;
 
 		{
-			PROFILER_SCOPED(&testProfiler, "Propagation");
-			propMatrix.updateCells();
+			std::future<int> result = threadPool.Submit([&testProfiler, &propMatrix]() -> int
+			{
+				testProfiler.PushThreadEvent(THREAD_TAG_PROPAGATION);
+				//PROFILER_SCOPED(&testProfiler, "Propagation");
+				propMatrix.updateCells();
+				//testProfiler.PushThreadEvent(THREAD_TAG_UNKNOWN);
+
+				return 1;
+			});
+
+			testProfiler.PushThreadEvent(THREAD_TAG_WAITING);
+			result.get();
+			testProfiler.PushThreadEvent(THREAD_TAG_MAIN_THREAD);
 		}
 
 		sf::Time propagationUpdateTime = propagationTimer.getElapsedTime();
@@ -468,12 +756,55 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 		drawFpsCounter(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), deltaTime);
 		//drawThreadId(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont());
-		
+
+
 		{
-			PROFILER_SCOPED(&testProfiler, "Rendering");
+			PROFILER_SCOPED(&testProfiler, "Sample Tasks", 0xff0000ff);
+			testProfiler.PushThreadEvent(THREAD_TAG_WAITING);
+			LaunchSampleGameThreads(threadPool, testProfiler);
+			testProfiler.PushThreadEvent(THREAD_TAG_MAIN_THREAD);
+		}
+
+
+		{
+			PROFILER_SCOPED(&testProfiler, "Profiler Rendering", 0xffff00ff);
+			testProfiler.PushThreadEvent(THREAD_TAG_PROFILER_RENDER);
+
+			ProfilerNode* previousFrameNode = testProfiler.GetPreviousFrameRootNode();
+			if(previousFrameNode)
+			{
+				float frameTime = GO_APIProfiler::TicksToMilliseconds(previousFrameNode->myAccumulator);
+
+				sf::Vector2u windowSize = window.getSize();
+				sf::Vector2f profilerSize = sf::Vector2f(0.8f * windowSize.x, 0.1f * windowSize.y);
+				sf::Vector2f profilerOffset = sf::Vector2f(0.1f * windowSize.x, 0.1f * windowSize.y);
+
+				sf::RectangleShape background(profilerSize);
+				background.setPosition(profilerOffset);
+				background.setFillColor(sf::Color(0x44444411));
+				window.draw(background);
+
+				//RenderProfilerLevel(previousFrameNode, profilerOffset, profilerSize, window);
+			
+				
+				const std::vector<ProfilerThreadEvent>& threadEvents = testProfiler.GetPreviousFrameThreadEvents();
+
+				sf::Vector2f threadProfilerOffset = sf::Vector2f(0.1f * windowSize.x, 0.1f * windowSize.y);
+				profilerOffset += sf::Vector2f(0.0f, 250.0f);
+
+				RenderThreadEvents(threadEvents, testProfiler.GetPreviousFrameStartTime(), frameTime, threadProfilerOffset, profilerSize, window);
+			}
+		}
+		testProfiler.PushThreadEvent(THREAD_TAG_MAIN_THREAD);
+		
+
+		{
+			PROFILER_SCOPED(&testProfiler, "Rendering", 0xaa00aaff);
 			window.display();
 		}
 
+		// TODO: We shouldn't have to insert this one once the final events for each thread are drawn
+		testProfiler.PushThreadEvent(THREAD_TAG_WAITING);
 		PROFILER_END_FRAME(testProfiler);
 	}
 

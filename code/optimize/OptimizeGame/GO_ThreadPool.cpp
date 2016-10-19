@@ -1,13 +1,19 @@
 #include "StableHeaders.h"
 #include "GO_ThreadPool.h"
+#include "GO_Profiler.h"
 
 #include <memory>
 
+// TODO: Move these to a common tag setup somewhere
+const unsigned char THREAD_TAG_UNKNOWN = 0;
+const unsigned char THREAD_TAG_WAITING = 1;
+
 namespace GO
 {
-	ThreadPool::ThreadPool()
+	ThreadPool::ThreadPool(GO_APIProfiler* aProfiler)
 		: myIsDone(false)
 		, myThreadJoiner(myThreads)
+		, myProfiler(aProfiler)
 	{
 		unsigned int threadCount = std::thread::hardware_concurrency();
 
@@ -24,15 +30,36 @@ namespace GO
 
 	void ThreadPool::WorkerThread()
 	{
+		bool hasPushedWaitingEvent = false;
+
+		myProfiler->PushThreadEvent(THREAD_TAG_WAITING);
+
 		while(!myIsDone)
 		{
 			std::packaged_task<int()> task;
 			if (myWorkQueue.TryPop(task))
 			{
+				// TODO: We should be grabbing the current threads tag and storing that
+				//		 internally when we actually submit a task into the system. At
+				//		 that point we can assert that we have a valid thread tag so that
+				//		 no one can schedule a task without a proper tag
 				task();
+
+				// TODO: We may get context swapped out here since all of our futures are complete
+				//		 and the main thread starts running now. We need to find a way to push this
+				//		 event on without getting swapped out (we will show longer than we actually
+				//		 were)
+				myProfiler->PushThreadEvent(THREAD_TAG_WAITING);
+				hasPushedWaitingEvent = false;
 			}
 			else
 			{
+				if(!hasPushedWaitingEvent)
+				{
+					myProfiler->PushThreadEvent(THREAD_TAG_WAITING);
+					hasPushedWaitingEvent = true;
+				}
+
 				std::this_thread::yield();
 			}
 		}
