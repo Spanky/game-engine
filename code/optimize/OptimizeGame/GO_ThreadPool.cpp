@@ -10,12 +10,12 @@ const unsigned char THREAD_TAG_WAITING = 1;
 
 namespace GO
 {
-	ThreadPool::ThreadPool(GO_APIProfiler* aProfiler)
+	ThreadPool::ThreadPool(GO_APIProfiler* aProfiler, unsigned int aNumThreads)
 		: myIsDone(false)
 		, myThreadJoiner(myThreads)
 		, myProfiler(aProfiler)
 	{
-		unsigned int threadCount = std::thread::hardware_concurrency();
+		unsigned int threadCount = aNumThreads ? aNumThreads : std::thread::hardware_concurrency();
 
 		for (unsigned int i = 0; i < threadCount; i++)
 		{
@@ -26,6 +26,7 @@ namespace GO
 	ThreadPool::~ThreadPool()
 	{
 		myIsDone = true;
+		// NOTE: The destructor of the thread joiner prevents this method from exiting until all threads are terminated
 	}
 
 	void ThreadPool::WorkerThread()

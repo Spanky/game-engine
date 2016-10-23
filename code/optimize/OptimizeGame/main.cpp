@@ -606,7 +606,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	GO_APIProfiler testProfiler;
 #endif	// #if PROFILER_ENABLED
 
-	GO::ThreadPool threadPool(&testProfiler);
+	GO::ThreadPool threadPool(&testProfiler, 0);
 
 	while(window.isOpen())
 	{
