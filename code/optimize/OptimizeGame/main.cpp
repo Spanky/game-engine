@@ -277,7 +277,7 @@ void RenderThreadEvents(const std::vector<ProfilerThreadEvent>& someThreadEvents
 
 	long long mainThreadTime = 0;
 	int numMainThreads = 0;
-	for(int i = someThreadEvents.size() - 1; i >= 0; i--)
+	for(size_t i = someThreadEvents.size() - 1; i >= 0; i--)
 	{
 		// TODO: Hard-coded thread index here
 		if(someThreadEvents[i].myThreadIndex == GetCurrentThreadIndex())
@@ -637,13 +637,12 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 
 		{
+			PROFILER_SCOPED(&testProfiler, "Task Scheduler", 0xffff00ff);
 			window.setActive(false);
 
 			std::future<int> result = threadPool.Submit([&testProfiler, &gameInstance, &window]() -> int
 			{
 				testProfiler.PushThreadEvent(THREAD_TAG_TASK_SCHEDULER);
-				
-				//PROFILER_SCOPED(&testProfiler, "Task Scheduler");
 				window.setActive(true);
 				gameInstance.getTaskScheduler().update();
 				window.setActive(false);
@@ -739,12 +738,11 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		sf::Clock propagationTimer;
 
 		{
+			PROFILER_SCOPED(&testProfiler, "Propagation", 0xff55d3ff);
 			std::future<int> result = threadPool.Submit([&testProfiler, &propMatrix]() -> int
 			{
 				testProfiler.PushThreadEvent(THREAD_TAG_PROPAGATION);
-				//PROFILER_SCOPED(&testProfiler, "Propagation");
 				propMatrix.updateCells();
-				//testProfiler.PushThreadEvent(THREAD_TAG_UNKNOWN);
 
 				return 1;
 			});
@@ -764,6 +762,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 		{
 			PROFILER_SCOPED(&testProfiler, "Sample Tasks", 0xff0000ff);
+			// TODO: This is not strictly wait time. It's ignoring the time it takes to queue up the jobs
 			testProfiler.PushThreadEvent(THREAD_TAG_WAITING);
 			LaunchSampleGameThreads(threadPool, testProfiler);
 			testProfiler.PushThreadEvent(THREAD_TAG_MAIN_THREAD);
@@ -788,13 +787,13 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 				background.setFillColor(sf::Color(0x44444411));
 				window.draw(background);
 
-				//RenderProfilerLevel(previousFrameNode, profilerOffset, profilerSize, window);
+				RenderProfilerLevel(previousFrameNode, profilerOffset, profilerSize, window);
 			
 				
 				const std::vector<ProfilerThreadEvent>& threadEvents = testProfiler.GetPreviousFrameThreadEvents();
 
 				sf::Vector2f threadProfilerOffset = sf::Vector2f(0.1f * windowSize.x, 0.1f * windowSize.y);
-				profilerOffset += sf::Vector2f(0.0f, 250.0f);
+				threadProfilerOffset += sf::Vector2f(0.0f, profilerSize.y + 150.0f);
 
 				RenderThreadEvents(threadEvents, testProfiler.GetPreviousFrameStartTime(), frameTime, threadProfilerOffset, profilerSize, window);
 			}
