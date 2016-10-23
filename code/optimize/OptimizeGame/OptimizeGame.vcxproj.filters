@@ -114,6 +114,9 @@
     <ClCompile Include="GO_Profiler.cpp">
       <Filter>Profiling</Filter>
     </ClCompile>
+    <ClCompile Include="GO_ProfilerRenderer.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StableHeaders.h">
@@ -183,6 +186,12 @@
       <Filter>Threading</Filter>
     </ClInclude>
     <ClInclude Include="GO_Profiler.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ProfilerRenderer.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ProfilerTags.h">
       <Filter>Profiling</Filter>
     </ClInclude>
   </ItemGroup>

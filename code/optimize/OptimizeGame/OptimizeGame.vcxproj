@@ -169,6 +169,7 @@
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AssemblyAndSourceCode</AssemblerOutput>
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AssemblyAndSourceCode</AssemblerOutput>
     </ClCompile>
+    <ClCompile Include="GO_ProfilerRenderer.cpp" />
     <ClCompile Include="GO_PropagationCell.cpp" />
     <ClCompile Include="GO_PropagationMatrix.cpp" />
     <ClCompile Include="GO_PropagationRow.cpp" />
@@ -196,6 +197,8 @@
     <ClInclude Include="GO_Gameworks.h" />
     <ClInclude Include="GO_HacksGlobalResources.h" />
     <ClInclude Include="GO_Profiler.h" />
+    <ClInclude Include="GO_ProfilerRenderer.h" />
+    <ClInclude Include="GO_ProfilerTags.h" />
     <ClInclude Include="GO_PropagationCell.h" />
     <ClInclude Include="GO_PropagationMatrix.h" />
     <ClInclude Include="GO_PropagationRow.h" />
