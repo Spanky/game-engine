@@ -16,6 +16,7 @@
 #include "GO_ProfilerRenderer.h"
 
 
+#include "GO_HealthComponent.h"
 #include "GO_StatusEffectComponent.h"
 #include "GO_SpriteComponent.h"
 #include "GO_RandomMovementComponent.h"
@@ -38,7 +39,7 @@ void drawFpsCounter(sf::RenderWindow& aWindow, const sf::Font& aFont, sf::Time a
 	text.setColor(sf::Color::Red);
 
 	char buffer[Int64TextWidth];
-	_i64toa_s(aDeltaTime.asMicroseconds(), buffer, Int64TextWidth, 10);
+	_i64toa_s(aDeltaTime.asMilliseconds(), buffer, Int64TextWidth, 10);
 	//_gcvt_s(buffer, Int64TextWidth, elapsedTime, 20);
 
 	text.setString(buffer);
@@ -171,8 +172,240 @@ void LaunchSampleGameThreads(GO::ThreadPool& aThreadPool, GO_APIProfiler& aProfi
 	GO_ASSERT(resultCounter == NumJobsSubmitted, "Number of jobs processed was not the same as the number of jobs submitted");
 }
 
+void TestFrameProcessor()
+{
+	const int numHardwareThreads = std::thread::hardware_concurrency();
+	const int numFrameTasks = numHardwareThreads;
+
+
+	std::condition_variable frameStarted;
+	std::mutex frameStartedLock;
+
+	GO_FrameTaskProcessor** frameProcessors = new GO_FrameTaskProcessor*[numFrameTasks];
+
+	// TODO: Having to create std::function objects really sucks. Find a cleaner way to pass
+	// the threadable object to the constructor of the uniform thread group
+	auto callableFrameProcessors = new std::function<void()>[numFrameTasks];
+	for (int i = 0; i < numFrameTasks; i++)
+	{
+		frameProcessors[i] = new GO_FrameTaskProcessor(&frameStarted, &frameStartedLock);
+		callableFrameProcessors[i] = std::function<void()>(*frameProcessors[i]);
+	}
+
+	GO::UniformThreadGroup threadGroup(numFrameTasks, callableFrameProcessors);
+
+	{
+		std::lock_guard<std::mutex> lk(frameStartedLock);
+		ourGlobalFrameCounter = 1;
+		frameStarted.notify_all();
+	}
+
+	{
+		std::lock_guard<std::mutex> lk(frameStartedLock);
+		ourGlobalFrameCounter = -1;
+		frameStarted.notify_all();
+	}
+
+
+
+	threadGroup.join();
+
+	for (int i = 0; i < numFrameTasks; i++)
+	{
+		delete frameProcessors[i];
+	}
+	delete[] frameProcessors;
+	frameProcessors = nullptr;
+
+
+	delete[] callableFrameProcessors;
+
+	delete[] frameProcessors;
+	frameProcessors = nullptr;
+}
+
+
+struct CombatDamageMessage
+{
+	GO::Entity* myDealerEntity;
+	GO::Entity* myReceiverEntity;
+	float myDamageDealt;
+};
+
+struct EntityDeathMessage
+{
+	// TODO: Replace these with handles eventually to avoid the constant lookups all the time
+	size_t myDeadEntityId;
+	size_t myKillerEntityId;
+};
+
+struct EntitySpawnMessage
+{
+};
+
+std::vector<CombatDamageMessage> ourCombatDamageMessages;
+std::vector<EntityDeathMessage> ourEntityDeathMessages;
+std::vector<EntitySpawnMessage> ourEntitySpawnMessages;
+
+
+
+float DistanceBetweenEntities(const GO::Entity* aLHS, const GO::Entity* aRHS)
+{
+	const sf::Vector2i& lhsPosition = aLHS->getPosition();
+	const sf::Vector2i& rhsPosition = aRHS->getPosition();
+
+	return std::sqrt(((lhsPosition.x - rhsPosition.x) * (lhsPosition.x - rhsPosition.x))
+		+ ((lhsPosition.y - rhsPosition.y) * (lhsPosition.y - rhsPosition.y)));
+}
+
+namespace GameEvents
+{
+	void QueueDamage(GO::Entity* aDealer, GO::Entity* aReceiver, const float aDamageDone)
+	{
+		CombatDamageMessage msg;
+		msg.myDealerEntity = aDealer;
+		msg.myReceiverEntity = aReceiver;
+		msg.myDamageDealt = aDamageDone;
+
+		ourCombatDamageMessages.push_back(msg);
+	}
+
+	void QueueEntityForDeath(const GO::Entity* aDeadEntity, const GO::Entity* aKillerEntity)
+	{
+		EntityDeathMessage msg;
+		msg.myDeadEntityId = aDeadEntity->getId();
+		msg.myKillerEntityId = aKillerEntity->getId();
+
+		ourEntityDeathMessages.push_back(msg);
+	}
+
+	void QueueEntityForSpawn()
+	{
+		EntitySpawnMessage msg;
+
+		ourEntitySpawnMessages.push_back(msg);
+	}
+}
+
+int UpdatePlayerInput(GO::World* aWorld, GO_APIProfiler* aProfiler)
+{
+	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
+	
+	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
+	{
+		GameEvents::QueueEntityForSpawn();
+	}
+
+	return 1;
+}
+
+int CalculateCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
+{
+	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
+
+	const GO::World::EntityList& entityList = aWorld->getEntities();
+	const size_t entityListSize = entityList.size();
+
+	for(size_t outerIndex = 0; outerIndex < entityListSize; outerIndex++)
+	{
+		GO::Entity* outerEntity = entityList[outerIndex];
+		GO_ASSERT(outerEntity, "Entity list contains a nullptr");
+
+		for(size_t innerIndex = outerIndex + 1; innerIndex < entityListSize; innerIndex++)
+		{
+			GO::Entity* innerEntity = entityList[innerIndex];
+			GO_ASSERT(innerEntity, "Entity list contains a nullptr");
+
+			const float distance = DistanceBetweenEntities(outerEntity, innerEntity);
+			if(distance < 100.0f)
+			{
+				GameEvents::QueueDamage(outerEntity, innerEntity, 1.0f);
+				GameEvents::QueueDamage(innerEntity, outerEntity, 1.0f);
+			}
+		}
+	}
+
+	return 1;
+}
+
+int ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
+{
+	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+
+	const GO::World::EntityList& entityList = aWorld->getEntities();
+	const size_t entityListSize = entityList.size();
+
+	for(const CombatDamageMessage& damageMsg : ourCombatDamageMessages)
+	{
+		GO::Entity* dealerEntity = damageMsg.myDealerEntity;
+		GO::Entity* receiverEntity = damageMsg.myReceiverEntity;
+
+		GO::HealthComponent* dealerHealthComp = dealerEntity->getComponent<GO::HealthComponent>();
+		GO::HealthComponent* receiverHealthComp = receiverEntity->getComponent<GO::HealthComponent>();
+
+		GO_ASSERT(receiverHealthComp, "Receiver that took damage doesn't have a health component");
+
+		receiverHealthComp->myHealth -= damageMsg.myDamageDealt;
+		if(receiverHealthComp->myHealth <= 0.0f)
+		{
+			GameEvents::QueueEntityForDeath(receiverEntity, dealerEntity);
+		}
+	}
+
+	ourCombatDamageMessages.clear();
+	return 1;
+}
+
+int ApplyEntityDeaths(GO::World* aWorld, GO_APIProfiler* aProfiler)
+{
+	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+
+	const GO::World::EntityList& entityList = aWorld->getEntities();
+
+	for(const EntityDeathMessage& deathMsg : ourEntityDeathMessages)
+	{
+		const size_t deadEntityId = deathMsg.myDeadEntityId;
+		
+		GO::World::EntityList::const_iterator deadIter = std::find_if(entityList.begin(), entityList.end(),
+			[deadEntityId](const GO::Entity* anEntity)
+		{
+			return anEntity->getId() == deadEntityId;
+		});
+
+		// We may have already destroyed this entity so don't bother destroying it again
+		// (Multiple things could have all killed this entity in the same frame)
+		if(deadIter != entityList.end())
+		{
+			aWorld->destroyEntity(*deadIter);
+		}
+	}
+
+	ourEntityDeathMessages.clear();
+
+	return 1;
+}
+
+int ApplyEntitySpawns(GO::World* aWorld, GO_APIProfiler* aProfiler)
+{
+	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+
+	for(const EntitySpawnMessage& spawnMsg : ourEntitySpawnMessages)
+	{
+		GO::Entity* entity = aWorld->createEntity();
+		entity->createComponent<GO::SpriteComponent>();
+		entity->createComponent<GO::RandomMovementComponent>();
+		entity->createComponent<GO::HealthComponent>();
+	}
+
+	ourEntitySpawnMessages.clear();
+	return 1;
+}
+
+
 int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
+	TestFrameProcessor();
+
 	ourGameworks.myDataDirectory = "..\\..\\..\\data\\";
 	sf::err().rdbuf(ourGameworks.mySFMLOutput.rdbuf());
 
@@ -269,11 +502,12 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	GO::GameInstance gameInstance(window, ourGameworks);
 	GO::World world;
 
-	for (int i = 0; i < 5; ++i)
+	for (int i = 0; i < 500; ++i)
 	{
 		GO::Entity* entity = world.createEntity();
 		entity->createComponent<GO::SpriteComponent>();
 		entity->createComponent<GO::RandomMovementComponent>();
+		entity->createComponent<GO::HealthComponent>();
 	}
 
 
@@ -283,54 +517,6 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	bool canMoveUp = true;
 	bool canMoveDown = true;
 
-	const int numHardwareThreads = std::thread::hardware_concurrency();
-	const int numFrameTasks = numHardwareThreads;
-
-
-	std::condition_variable frameStarted;
-	std::mutex frameStartedLock;
-
-	GO_FrameTaskProcessor** frameProcessors = new GO_FrameTaskProcessor*[numFrameTasks];
-	
-	// TODO: Having to create std::function objects really sucks. Find a cleaner way to pass
-	// the threadable object to the constructor of the uniform thread group
-	auto callableFrameProcessors = new std::function<void()>[numFrameTasks];
-	for (int i = 0; i < numFrameTasks; i++)
-	{
-		frameProcessors[i] = new GO_FrameTaskProcessor(&frameStarted, &frameStartedLock);
-		callableFrameProcessors[i] = std::function<void()>(*frameProcessors[i]);
-	}
-
-	GO::UniformThreadGroup threadGroup(numFrameTasks, callableFrameProcessors);
-
-	{
-		std::lock_guard<std::mutex> lk(frameStartedLock);
-		ourGlobalFrameCounter = 1;
-		frameStarted.notify_all();
-	}
-
-	{
-		std::lock_guard<std::mutex> lk(frameStartedLock);
-		ourGlobalFrameCounter = -1;
-		frameStarted.notify_all();
-	}
-
-
-
-	threadGroup.join();
-
-	for (int i = 0; i < numFrameTasks; i++)
-	{
-		delete frameProcessors[i];
-	}
-	delete[] frameProcessors;
-	frameProcessors = nullptr;
-
-
-	delete[] callableFrameProcessors;
-
-	delete[] frameProcessors;
-	frameProcessors = nullptr;
 
 #if PROFILER_ENABLED
 	GO_APIProfiler testProfiler;
@@ -388,102 +574,150 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		}
 
 
-		if (canMoveRight)
 		{
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-			{
-				canMoveRight = false;
+			PROFILER_SCOPED(&testProfiler, "Calculate Game Step", 0xff0000ff);
+			std::vector<std::future<int>> gameTaskFutures;
 
-				playerPosition += sf::Vector2f(100.0f, 0.0f);
-				propMatrix.setCenter(playerPosition);
-			}
-		}
-		else
-		{
-			if(!sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-			{
-				canMoveRight = true;
-			}
-		}
+			std::future<int> calculateCombatDamage = threadPool.Submit(std::bind(&CalculateCombatDamage, &world, &testProfiler));
+			gameTaskFutures.push_back(std::move(calculateCombatDamage));
 
-		if (canMoveLeft)
-		{
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-			{
-				canMoveLeft = false;
-
-				playerPosition -= sf::Vector2f(100.0f, 0.0f);
-				propMatrix.setCenter(playerPosition);
-			}
-		}
-		else
-		{
-			if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-			{
-				canMoveLeft = true;
-			}
-		}
+			std::future<int> updatePlayerInput = threadPool.Submit(std::bind(&UpdatePlayerInput, &world, &testProfiler));
+			gameTaskFutures.push_back(std::move(updatePlayerInput));
 
 
-
-		if (canMoveDown)
-		{
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-			{
-				canMoveDown = false;
-
-				playerPosition += sf::Vector2f(0.0f, 100.0f);
-				propMatrix.setCenter(playerPosition);
-			}
-		}
-		else
-		{
-			if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-			{
-				canMoveDown = true;
-			}
-		}
-
-		if (canMoveUp)
-		{
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-			{
-				canMoveUp = false;
-
-				playerPosition -= sf::Vector2f(0.0f, 100.0f);
-				propMatrix.setCenter(playerPosition);
-			}
-		}
-		else
-		{
-			if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-			{
-				canMoveUp = true;
-			}
-		}
-
-
-		//propMatrix.debugDraw();
-
-		sf::Clock propagationTimer;
-
-		{
-			PROFILER_SCOPED(&testProfiler, "Propagation", 0xff55d3ff);
-			std::future<int> result = threadPool.Submit([&testProfiler, &propMatrix]() -> int
-			{
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_PROPAGATION);
-				propMatrix.updateCells();
-
-				return 1;
-			});
 
 			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
-			result.get();
+			for(std::future<int>& currentGameTask : gameTaskFutures)
+			{
+				currentGameTask.get();
+			}
 			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
 		}
 
-		sf::Time propagationUpdateTime = propagationTimer.getElapsedTime();
-		drawTimer(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), propagationUpdateTime, sf::Vector2f(500.0f, 500.0f));
+		{
+			PROFILER_SCOPED(&testProfiler, "Apply Game Step", 0x00ff00ff);
+
+			{
+				std::future<int> applyCombatDamage = threadPool.Submit(std::bind(&ApplyCombatDamage, &world, &testProfiler));
+
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
+				applyCombatDamage.get();
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
+			}
+
+			{
+				std::future<int> applyDeaths = threadPool.Submit(std::bind(&ApplyEntityDeaths, &world, &testProfiler));
+				
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
+				applyDeaths.get();
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
+			}
+
+			{
+				std::future<int> applySpawns = threadPool.Submit(std::bind(&ApplyEntitySpawns, &world, &testProfiler));
+
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
+				applySpawns.get();
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
+			}
+		}
+
+
+		//if (canMoveRight)
+		//{
+		//	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+		//	{
+		//		canMoveRight = false;
+
+		//		playerPosition += sf::Vector2f(100.0f, 0.0f);
+		//		propMatrix.setCenter(playerPosition);
+		//	}
+		//}
+		//else
+		//{
+		//	if(!sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+		//	{
+		//		canMoveRight = true;
+		//	}
+		//}
+
+		//if (canMoveLeft)
+		//{
+		//	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+		//	{
+		//		canMoveLeft = false;
+
+		//		playerPosition -= sf::Vector2f(100.0f, 0.0f);
+		//		propMatrix.setCenter(playerPosition);
+		//	}
+		//}
+		//else
+		//{
+		//	if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+		//	{
+		//		canMoveLeft = true;
+		//	}
+		//}
+
+
+
+		//if (canMoveDown)
+		//{
+		//	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
+		//	{
+		//		canMoveDown = false;
+
+		//		playerPosition += sf::Vector2f(0.0f, 100.0f);
+		//		propMatrix.setCenter(playerPosition);
+		//	}
+		//}
+		//else
+		//{
+		//	if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
+		//	{
+		//		canMoveDown = true;
+		//	}
+		//}
+
+		//if (canMoveUp)
+		//{
+		//	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
+		//	{
+		//		canMoveUp = false;
+
+		//		playerPosition -= sf::Vector2f(0.0f, 100.0f);
+		//		propMatrix.setCenter(playerPosition);
+		//	}
+		//}
+		//else
+		//{
+		//	if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
+		//	{
+		//		canMoveUp = true;
+		//	}
+		//}
+
+
+		//propMatrix.debugDraw();
+		//sf::Clock propagationTimer;
+
+		//{
+		//	PROFILER_SCOPED(&testProfiler, "Propagation", 0xff55d3ff);
+		//	std::future<int> result = threadPool.Submit([&testProfiler, &propMatrix]() -> int
+		//	{
+		//		testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_PROPAGATION);
+		//		propMatrix.updateCells();
+
+		//		return 1;
+		//	});
+
+		//	testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
+		//	result.get();
+		//	testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
+		//}
+
+		//sf::Time propagationUpdateTime = propagationTimer.getElapsedTime();
+		//drawTimer(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), propagationUpdateTime, sf::Vector2f(500.0f, 500.0f));
 
 
 		drawFpsCounter(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), deltaTime);
