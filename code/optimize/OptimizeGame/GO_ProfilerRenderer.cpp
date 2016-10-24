@@ -77,8 +77,12 @@ namespace GO_ProfilerRenderer
 		case GO_ProfilerTags::THREAD_TAG_GAME_TASK:
 			return sf::Color(0xff0000ff);
 		case GO_ProfilerTags::THREAD_TAG_MAIN_THREAD:
-			return sf::Color(0x00ff00ff);
+			return sf::Color(0x009900ff);
 		case GO_ProfilerTags::THREAD_TAG_PROFILER_RENDER:
+			return sf::Color(0xaa00ffff);
+		case GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK:
+			return sf::Color(0x00ff00ff);
+		case GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK:
 			return sf::Color(0x0000ffff);
 		default:
 			return sf::Color(0xff00ffff);
@@ -96,7 +100,23 @@ namespace GO_ProfilerRenderer
 			unsigned char myLastThreadTag;
 		};
 
-		std::vector<ThreadSpecificEventInfo> threadSpecificInfos;
+		static std::vector<ThreadSpecificEventInfo> threadSpecificInfos;
+
+		// Draw a background over the known threads to make it easier to see
+		sf::Vector2f rectSize;
+		rectSize.x = aRegionSize.x;
+		rectSize.y = 15.0f * threadSpecificInfos.size();
+
+		sf::Vector2f rectPosition;
+		rectPosition.x = aStartingPosition.x;
+		rectPosition.y = aStartingPosition.y;
+
+		sf::RectangleShape profilerOutline(rectSize);
+		profilerOutline.setPosition(rectPosition);
+		profilerOutline.setFillColor(sf::Color(0x000000BB));
+		aWindow.draw(profilerOutline);
+
+
 
 		unsigned int numDrawn = 0;
 
@@ -120,7 +140,7 @@ namespace GO_ProfilerRenderer
 
 		for (const ProfilerThreadEvent& pte : someThreadEvents)
 		{
-			GO_ASSERT(pte.myStartTime >= aFrameStartTime, "Received an event that started before the frame did");
+			//GO_ASSERT(pte.myStartTime >= aFrameStartTime, "Received an event that started before the frame did");
 
 			// As we go over every event, keep track of the threads that we encounter so we know where to put the markers
 			size_t lookupIndex = 0;
@@ -153,12 +173,12 @@ namespace GO_ProfilerRenderer
 			// Skip elements that are under our tolerance to avoid creating tons of small rectangles. Merge them
 			// into one larger rectangle
 
-			GO_ASSERT(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
-			if (!(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1))
-			{
-				int* test = nullptr;
-				(*test) = 5;
-			}
+			//GO_ASSERT(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
+			//if (!(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1))
+			//{
+			//	int* test = nullptr;
+			//	(*test) = 5;
+			//}
 
 			// TODO: The start time may be before this frame has actually started.
 			//		 This would indicate an event that was carried forward from the
