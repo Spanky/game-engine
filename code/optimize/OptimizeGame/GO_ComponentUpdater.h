@@ -14,7 +14,5 @@ namespace GO
 
 	private:
 		std::vector<EntityComponent*> myComponents;
-
-		//std::vector<sf::Sprite> mySprites;
 	};
 }
