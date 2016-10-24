@@ -12,6 +12,7 @@ namespace GO
 		void update();
 
 		void registerComponent(EntityComponent* aComponent);
+		void unregisterComponent(EntityComponent* aComponent);
 
 	private:
 		ComponentUpdater myComponentUpdater;

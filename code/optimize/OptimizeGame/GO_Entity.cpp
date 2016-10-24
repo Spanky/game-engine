@@ -3,6 +3,9 @@
 #include "GO_Entity.h"
 #include "GO_EntityComponent.h"
 
+#include "GO_GameInstance.h"
+#include "GO_TaskScheduler.h"
+
 static std::atomic_size_t ourNextEntityId = 0;
 
 namespace GO
@@ -21,6 +24,7 @@ namespace GO
 	{
 		for(EntityComponent* currentComponent : myComponents)
 		{
+			GameInstance::GetInstance()->getTaskScheduler().unregisterComponent(currentComponent);
 			delete currentComponent;
 		}
 		myComponents.clear();

@@ -13,4 +13,9 @@ namespace GO
 	{
 		myComponentUpdater.registerComponent(aComponent);
 	}
+
+	void TaskScheduler::unregisterComponent(EntityComponent* aComponent)
+	{
+		myComponentUpdater.unregisterComponent(aComponent);
+	}
 }
