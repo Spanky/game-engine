@@ -194,5 +194,8 @@
     <ClInclude Include="GO_ProfilerTags.h">
       <Filter>Profiling</Filter>
     </ClInclude>
+    <ClInclude Include="GO_HealthComponent.h">
+      <Filter>Entity Systems\Components</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
