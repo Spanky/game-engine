@@ -45,6 +45,8 @@ class GO_APIProfiler
 {
 public:
 	GO_APIProfiler();
+	GO_APIProfiler(const GO_APIProfiler& aRHS) = delete;
+	GO_APIProfiler& operator=(const GO_APIProfiler& aRHS) = delete;
 
 	void BeginFrame();
 	void EndFrame();
