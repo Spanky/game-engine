@@ -117,6 +117,9 @@
     <ClCompile Include="GO_ProfilerRenderer.cpp">
       <Filter>Profiling</Filter>
     </ClCompile>
+    <ClCompile Include="GO_MovementComponent.cpp">
+      <Filter>Entity Systems\Components</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StableHeaders.h">
@@ -195,6 +198,9 @@
       <Filter>Profiling</Filter>
     </ClInclude>
     <ClInclude Include="GO_HealthComponent.h">
+      <Filter>Entity Systems\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_MovementComponent.h">
       <Filter>Entity Systems\Components</Filter>
     </ClInclude>
   </ItemGroup>

@@ -165,6 +165,7 @@
     <ClCompile Include="GO_EntityComponent.cpp" />
     <ClCompile Include="GO_GameInstance.cpp" />
     <ClCompile Include="GO_HacksGlobalResources.cpp" />
+    <ClCompile Include="GO_MovementComponent.cpp" />
     <ClCompile Include="GO_Profiler.cpp">
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AssemblyAndSourceCode</AssemblerOutput>
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AssemblyAndSourceCode</AssemblerOutput>
@@ -197,6 +198,7 @@
     <ClInclude Include="GO_Gameworks.h" />
     <ClInclude Include="GO_HacksGlobalResources.h" />
     <ClInclude Include="GO_HealthComponent.h" />
+    <ClInclude Include="GO_MovementComponent.h" />
     <ClInclude Include="GO_Profiler.h" />
     <ClInclude Include="GO_ProfilerRenderer.h" />
     <ClInclude Include="GO_ProfilerTags.h" />
