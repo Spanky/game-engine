@@ -122,14 +122,15 @@ namespace GO_ProfilerRenderer
 
 
 		long long mainThreadTime = 0;
-		int numMainThreads = 0;
+		int numMainThreadEvents = 0;
 		for (size_t i = someThreadEvents.size() - 1; i >= 0; i--)
 		{
-			// TODO: Hard-coded thread index here
 			if (someThreadEvents[i].myThreadIndex == GetCurrentThreadIndex())
 			{
-				numMainThreads++;
-				if (numMainThreads == 4)
+				numMainThreadEvents++;
+
+				// TODO: Hard-coded number of events to reverse to find the last 'valid' marker
+				if (numMainThreadEvents == 4)
 				{
 					mainThreadTime = someThreadEvents[i].myStartTime;
 					break;
@@ -140,7 +141,7 @@ namespace GO_ProfilerRenderer
 
 		for (const ProfilerThreadEvent& pte : someThreadEvents)
 		{
-			//GO_ASSERT(pte.myStartTime >= aFrameStartTime, "Received an event that started before the frame did");
+			GO_ASSERT(pte.myStartTime >= aFrameStartTime, "Received an event that started before the frame did");
 
 			// As we go over every event, keep track of the threads that we encounter so we know where to put the markers
 			size_t lookupIndex = 0;
@@ -173,12 +174,12 @@ namespace GO_ProfilerRenderer
 			// Skip elements that are under our tolerance to avoid creating tons of small rectangles. Merge them
 			// into one larger rectangle
 
-			//GO_ASSERT(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
-			//if (!(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1))
-			//{
-			//	int* test = nullptr;
-			//	(*test) = 5;
-			//}
+			GO_ASSERT(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
+			if (!(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1))
+			{
+				int* test = nullptr;
+				(*test) = 5;
+			}
 
 			// TODO: The start time may be before this frame has actually started.
 			//		 This would indicate an event that was carried forward from the

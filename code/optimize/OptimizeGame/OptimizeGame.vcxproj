@@ -198,6 +198,7 @@
     <ClInclude Include="GO_Gameworks.h" />
     <ClInclude Include="GO_HacksGlobalResources.h" />
     <ClInclude Include="GO_HealthComponent.h" />
+    <ClInclude Include="GO_LockingThreadSafeQueue.h" />
     <ClInclude Include="GO_MovementComponent.h" />
     <ClInclude Include="GO_Profiler.h" />
     <ClInclude Include="GO_ProfilerRenderer.h" />

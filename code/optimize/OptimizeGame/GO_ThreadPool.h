@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GO_ThreadSafeQueue.h"
+#include "GO_LockingThreadSafeQueue.h"
 #include "GO_ThreadJoiner.h"
 
 class GO_APIProfiler;
@@ -35,7 +35,8 @@ namespace GO
 		//		 before the queue of work they are using.
 		// --------------------------------
 		std::atomic_bool myIsDone;
-		ThreadSafeQueue<std::packaged_task<int()>> myWorkQueue;
+		//ThreadSafeQueue<std::packaged_task<int()>> myWorkQueue;
+		LockingThreadSafeQueue<std::packaged_task<int()>> myWorkQueue;
 		std::vector<std::thread> myThreads;
 		ThreadJoiner myThreadJoiner;
 		// --------------------------------

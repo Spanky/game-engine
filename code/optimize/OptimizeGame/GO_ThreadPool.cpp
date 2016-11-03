@@ -35,6 +35,7 @@ namespace GO
 
 		myProfiler->PushThreadEvent(THREAD_TAG_WAITING);
 
+
 		while(!myIsDone)
 		{
 			std::packaged_task<int()> task;
@@ -61,7 +62,24 @@ namespace GO
 					hasPushedWaitingEvent = true;
 				}
 
-				std::this_thread::yield();
+				//std::this_thread::yield();
+
+				// TODO: We have no way to break out of this. We should really be waiting on a condition here
+				// that we can raise from somewhere else
+				myWorkQueue.WaitAndPop(task);
+
+				// TODO: We should be grabbing the current threads tag and storing that
+				//		 internally when we actually submit a task into the system. At
+				//		 that point we can assert that we have a valid thread tag so that
+				//		 no one can schedule a task without a proper tag
+				task();
+
+				// TODO: We may get context swapped out here since all of our futures are complete
+				//		 and the main thread starts running now. We need to find a way to push this
+				//		 event on without getting swapped out (we will show longer than we actually
+				//		 were)
+				myProfiler->PushThreadEvent(THREAD_TAG_WAITING);
+				hasPushedWaitingEvent = false;
 			}
 		}
 
