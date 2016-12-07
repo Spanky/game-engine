@@ -52,6 +52,12 @@
     <Filter Include="Profiling">
       <UniqueIdentifier>{3e4d1adc-df0c-449f-aeb9-5257dc3adf5d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Containers\Locking">
+      <UniqueIdentifier>{887163e0-3c1a-4bb4-be07-c948450b7370}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Containers\Lockless">
+      <UniqueIdentifier>{6ca8beed-ceaa-48bd-a961-783a75eece17}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -114,6 +120,12 @@
     <ClCompile Include="GO_Profiler.cpp">
       <Filter>Profiling</Filter>
     </ClCompile>
+    <ClCompile Include="GO_ProfilerRenderer.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_MovementComponent.cpp">
+      <Filter>Entity Systems\Components</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StableHeaders.h">
@@ -173,9 +185,6 @@
     <ClInclude Include="GO_UniformThreadGroup.h">
       <Filter>Threading</Filter>
     </ClInclude>
-    <ClInclude Include="GO_ThreadSafeQueue.h">
-      <Filter>Containers</Filter>
-    </ClInclude>
     <ClInclude Include="GO_ThreadPool.h">
       <Filter>Threading\Thread Pool</Filter>
     </ClInclude>
@@ -184,6 +193,24 @@
     </ClInclude>
     <ClInclude Include="GO_Profiler.h">
       <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ProfilerRenderer.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ProfilerTags.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_HealthComponent.h">
+      <Filter>Entity Systems\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_MovementComponent.h">
+      <Filter>Entity Systems\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_LockingThreadSafeQueue.h">
+      <Filter>Containers\Locking</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ThreadSafeQueue.h">
+      <Filter>Containers\Lockless</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

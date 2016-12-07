@@ -20,11 +20,15 @@
 #include <future>
 #include <mutex>
 #include <thread>
-#include <mutex>
-#include <atomic>
-#include <vector>
-#include <random>
 
+// ----------------------------------------------------------------------------
+// Standard Library -- Containers
+// ----------------------------------------------------------------------------
+#include <iterator>
+#include <vector>
+#include <queue>
+
+#include <random>
 #include <functional>
 
 

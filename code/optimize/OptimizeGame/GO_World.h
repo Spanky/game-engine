@@ -12,6 +12,9 @@ namespace GO
 	public:
 		World();
 
+		World(const World& aRHS) = delete;
+		World& operator=(const World& aRHS) = delete;
+
 		Entity* createEntity();
 		void destroyEntity(Entity* anEntityToDestroy);
 

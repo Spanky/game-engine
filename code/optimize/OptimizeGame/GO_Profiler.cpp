@@ -3,39 +3,32 @@
 
 #if PROFILER_ENABLED
 
-struct ProfilerNode
-{
-	// 0
-	const char* myName;
-
-	// 8
-	ProfilerNode* myFirstChild;
-	ProfilerNode* mySibling;
-	ProfilerNode* myParent;
-
-	// 32
-	long long myAccumulator;
-	long long myHitCount;
-
-	// 48
-	long long myCurrentStartTime;
-
-	long long myPadding;
-
-	// 64
-};
-
 // TODO: Move this to a common 'standards' file
 static const int CacheLineSizeInBytes = 64;
 
 static_assert(sizeof(ProfilerNode) <= CacheLineSizeInBytes, "ProfilerNode needs to fit in a single cache line");
 static_assert((CacheLineSizeInBytes % sizeof(ProfilerNode)) == 0, "ProfilerNode needs to fit evenly in a cache line");
 
-
-ProfilerNode locRootNode;
-
 double GO_APIProfiler::ourFrequency = 0;
-long long GO_APIProfiler::ourReportInterval = 0;
+
+thread_local unsigned char locMyThreadIndex = UCHAR_MAX;
+
+static std::atomic_uchar locTotalThreadCount = 0;
+static std::mutex locEventListMutex;
+
+
+unsigned char GetCurrentThreadIndex()
+{
+	if (locMyThreadIndex == UCHAR_MAX)
+	{
+		// TODO: The mod here is only to support our usage of std::thread since we spin up new threads
+		//		 for every thread pool right now
+		locMyThreadIndex = (locTotalThreadCount++);
+		GO_ASSERT(locMyThreadIndex < UCHAR_MAX, "Number of threads created exceeds hard-coded limits");
+	}
+
+	return locMyThreadIndex;
+}
 
 namespace
 {
@@ -57,10 +50,10 @@ namespace
 		aNode.myHitCount = 0;
 	}
 
-	void ResetRootNode()
+	void ResetToRootNode(ProfilerNode& aNode)
 	{
-		ResetNode(locRootNode);
-		locRootNode.myName = "Root";
+		ResetNode(aNode);
+		aNode.myName = "Root";
 	}
 
 	ProfilerNode* FindChildNode(ProfilerNode* aNode, const char* aChildName)
@@ -85,28 +78,59 @@ namespace
 }
 
 GO_APIProfiler::GO_APIProfiler()
-	: myLastFlushedOutputTime(0)
+	: myStart(0)
+	, myPreviousFrameStartTime(0)
+	, myProfilerOverhead(0)
 	, myCurrentNode(nullptr)
+	, myPreviousFrameRootNode(nullptr)
 {
+	LARGE_INTEGER freq;
+	QueryPerformanceFrequency(&freq);
+	ourFrequency = 1.0 / freq.QuadPart;
+
+	// TODO: Why do we need this memory barrier? It is a legacy call from the original Jeff Phreshing implementation
+	MemoryBarrier();
+
 	LARGE_INTEGER start;
 	QueryPerformanceCounter(&start);
 	myStart = start.QuadPart;
+}
 
-	ResetRootNode();
+void GO_APIProfiler::StoreFrameInHistory()
+{
+	myPreviousFrameStartTime = myCurrentFrameStartTime;
+	myCurrentFrameStartTime = locGetCurrentProfilerTime();
+
+	if (myPreviousFrameRootNode)
+	{
+		ReleaseNodeHierarchy(myPreviousFrameRootNode);
+	}
+	myPreviousFrameRootNode = myCurrentNode;
+
+	{
+		std::lock_guard<std::mutex> eventLock(locEventListMutex);
+		myPreviousThreadEvents = myThreadEvents;
+		myThreadEvents.clear();
+	}
 }
 
 
 void GO_APIProfiler::BeginFrame()
 {
-	locRootNode.myCurrentStartTime = locGetCurrentProfilerTime();
+	StoreFrameInHistory();
+
+	myCurrentNode = GetNewNode();
+	ResetToRootNode(*myCurrentNode);
+
+	myCurrentNode->myCurrentStartTime = locGetCurrentProfilerTime();
 	myProfilerOverhead = 0;
 
-	myCurrentNode = &locRootNode;
+	myCurrentFrameStartTime = myCurrentNode->myCurrentStartTime;
 }
 
 void GO_APIProfiler::EndFrame()
 {
-	assert(myCurrentNode == &locRootNode);
+	assert(myCurrentNode->myParent == nullptr && "Profile begin/end pairs mismatched. Root node expected to be the current node");
 	// TODO: Calling locGetCurrentProfilerTime() an additional jmp and mov instruction
 	//		 unrelated to the function call (it is inlined) compared to using:
 	//		 LARGE_INTEGER currentTime;
@@ -130,14 +154,8 @@ void GO_APIProfiler::EndFrame()
 	
 	long long frameEndTime = locGetCurrentProfilerTime();
 
-	locRootNode.myAccumulator += (frameEndTime - locRootNode.myCurrentStartTime);
-	locRootNode.myHitCount++;
-
-	if (locRootNode.myAccumulator > ourReportInterval)
-	{
-		Flush(frameEndTime);
-		ReleaseAllProfilerNodes();
-	}
+	myCurrentNode->myAccumulator += (frameEndTime - myCurrentNode->myCurrentStartTime);
+	myCurrentNode->myHitCount++;
 }
 
 void GO_APIProfiler::ReleaseNodeHierarchy(ProfilerNode* aProfilerNode)
@@ -154,22 +172,6 @@ void GO_APIProfiler::ReleaseNodeHierarchy(ProfilerNode* aProfilerNode)
 	delete aProfilerNode;
 }
 
-void GO_APIProfiler::ReleaseAllProfilerNodes()
-{
-	// NOTE: We do this manually since we do not want to call 'delete' on our root node.
-	// TODO: Add a parameter to determine if we need to delete the node or not?
-	ProfilerNode* childNode = locRootNode.myFirstChild;
-	while (childNode)
-	{
-		ProfilerNode* nextChild = childNode->mySibling;
-		ReleaseNodeHierarchy(childNode);
-
-		childNode = nextChild;
-	}
-
-	ResetRootNode();
-}
-
 ProfilerNode* GO_APIProfiler::GetNewNode()
 {
 	ProfilerNode* profilerNode = new ProfilerNode();
@@ -178,7 +180,7 @@ ProfilerNode* GO_APIProfiler::GetNewNode()
 	return profilerNode;
 }
 
-void GO_APIProfiler::BeginProfile(const char* aName)
+void GO_APIProfiler::BeginProfile(const char* aName, unsigned int aColor)
 {
 	long long startOverheadTime = locGetCurrentProfilerTime();
 
@@ -196,6 +198,7 @@ void GO_APIProfiler::BeginProfile(const char* aName)
 		myCurrentNode->myFirstChild = childNode;
 
 		childNode->myName = aName;
+		childNode->myColor = aColor;
 	}
 
 	myCurrentNode = childNode;
@@ -225,66 +228,24 @@ void GO_APIProfiler::EndProfile(const char* aName)
 	myProfilerOverhead += (start.QuadPart - profileEndTime);
 }
 
-void print_with_indent(int indent, char * string)
+void GO_APIProfiler::PushThreadEvent(unsigned char aThreadTag)
 {
-	printf("%*s %s", indent, "", string);
-}
+	ProfilerThreadEvent evt;
+	evt.myStartTime = locGetCurrentProfilerTime();
+	evt.myThreadIndex = GetCurrentThreadIndex();
+	evt.myThreadTag = aThreadTag;
 
-void GO_APIProfiler::PrintProfilerHierarchy(ProfilerNode* aRootNode, double anInterval, int aLevel)
-{
-	double measured = aRootNode->myAccumulator * ourFrequency;
+	GO_ASSERT(evt.myStartTime >= myCurrentFrameStartTime, "Recording a thread profile time before the frame has actually started");
 
-	char buffer[256];
-	sprintf(buffer,
-	"%*s TID 0x%x time spent in \"%s\": %0.f/%0.f ms %0.f %.1f%% %I64d\n",
-		aLevel * 2,
-		"",
-		GetCurrentThreadId(),
-		aRootNode->myName,
-
-		measured * 1000,
-		anInterval * 1000,
-		(measured * 1000 / aRootNode->myHitCount) * 1000,
-		100.f * measured / anInterval,
-		aRootNode->myHitCount);
-	OutputDebugString(buffer);
-
-
-	ProfilerNode* childNode = aRootNode->myFirstChild;
-	while (childNode)
 	{
-		ProfilerNode* nextChild = childNode->mySibling;
-		PrintProfilerHierarchy(childNode, anInterval, aLevel + 1);
-
-		childNode = nextChild;
+		std::lock_guard<std::mutex> lock(locEventListMutex);
+		myThreadEvents.push_back(evt);
 	}
 }
 
-void GO_APIProfiler::Flush(long long anEnd)
+float GO_APIProfiler::TicksToMilliseconds(long long aTickCount)
 {
-	if(ourReportInterval == 0)
-	{
-		LARGE_INTEGER freq;
-		QueryPerformanceFrequency(&freq);
-		ourFrequency = 1.0 / freq.QuadPart;
-		MemoryBarrier();
-		ourReportInterval = freq.QuadPart;
-	}
-
-	if(myLastFlushedOutputTime == 0)
-	{
-		myLastFlushedOutputTime = myStart;
-		return;
-	}
-
-	double interval = (anEnd - myLastFlushedOutputTime) * ourFrequency;
-	myLastFlushedOutputTime = anEnd;
-
-	char buffer[200];
-	sprintf(buffer, "Overhead: %0.f\n", myProfilerOverhead * ourFrequency * 1000);
-	OutputDebugString(buffer);
-
-	PrintProfilerHierarchy(myCurrentNode, interval, 0);
+	return aTickCount * ourFrequency * 1000;
 }
 
 #endif

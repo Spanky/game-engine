@@ -22,6 +22,8 @@ namespace GO
 		GO_ASSERT(iter != myEntities.end(), "Could not find entity to destroy");
 
 		myEntities.erase(iter);
+
+		anEntityToDestroy->destroyAllComponents();
 		delete anEntityToDestroy;
 	}
 }

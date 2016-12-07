@@ -1,14 +1,16 @@
 #pragma once
 
-#include "GO_ThreadSafeQueue.h"
+#include "GO_LockingThreadSafeQueue.h"
 #include "GO_ThreadJoiner.h"
+
+class GO_APIProfiler;
 
 namespace GO
 {
 	class ThreadPool
 	{
 	public:
-		ThreadPool();
+		ThreadPool(GO_APIProfiler* aProfiler, unsigned int aNumThreads);
 		~ThreadPool();
 
 		template<typename FunctionType>
@@ -28,9 +30,17 @@ namespace GO
 		void WorkerThread();
 
 	private:
+		// NOTE: The order of these members matters. The thread joiner must be last as it cannot
+		//		 be destroyed before the list of threads. The list of threads cannot be destroyed
+		//		 before the queue of work they are using.
+		// --------------------------------
 		std::atomic_bool myIsDone;
-		ThreadSafeQueue<std::packaged_task<int()>> myWorkQueue;
+		//ThreadSafeQueue<std::packaged_task<int()>> myWorkQueue;
+		LockingThreadSafeQueue<std::packaged_task<int()>> myWorkQueue;
 		std::vector<std::thread> myThreads;
 		ThreadJoiner myThreadJoiner;
+		// --------------------------------
+
+		GO_APIProfiler* myProfiler;
 	};
 }
