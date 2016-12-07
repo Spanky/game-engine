@@ -19,6 +19,9 @@ namespace GO
 		template<typename ComponentType>
 		ComponentType* getComponent();
 
+		template<typename ComponentType>
+		const ComponentType* getComponent() const;
+
 		void destroyAllComponents();
 
 		void update();
@@ -62,6 +65,20 @@ namespace GO
 		for(EntityComponent* currentComponent : myComponents)
 		{
 			if(dynamic_cast<ComponentType*>(currentComponent))
+			{
+				return static_cast<ComponentType*>(currentComponent);
+			}
+		}
+
+		return nullptr;
+	}
+
+	template<typename ComponentType>
+	const ComponentType* Entity::getComponent() const
+	{
+		for (EntityComponent* currentComponent : myComponents)
+		{
+			if (dynamic_cast<ComponentType*>(currentComponent))
 			{
 				return static_cast<ComponentType*>(currentComponent);
 			}
