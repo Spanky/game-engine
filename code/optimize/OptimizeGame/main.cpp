@@ -297,7 +297,7 @@ namespace GameEvents
 	}
 }
 
-int UpdatePlayerInput(GO::World* aWorld, GO_APIProfiler* aProfiler, GO::Entity* aPlayerEntity)
+int CalculateEntityMovements(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
 	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
 
@@ -332,13 +332,6 @@ int CalculateCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
 			}
 		}
 	}
-
-	return 1;
-}
-
-int RandomlyMoveEntities(GO::World* aWorld, GO_APIProfiler* aProfiler)
-{
-	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
 
 	return 1;
 }
@@ -605,11 +598,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			std::future<int> calculateCombatDamage = threadPool.Submit(std::bind(&CalculateCombatDamage, &world, &testProfiler));
 			gameTaskFutures.push_back(std::move(calculateCombatDamage));
 
-			std::future<int> randomlyMoveEntities = threadPool.Submit(std::bind(&RandomlyMoveEntities, &world, &testProfiler));
-			gameTaskFutures.push_back(std::move(randomlyMoveEntities));
-
-			std::future<int> updatePlayerInput = threadPool.Submit(std::bind(&UpdatePlayerInput, &world, &testProfiler, playerEntity));
-			gameTaskFutures.push_back(std::move(updatePlayerInput));
+			std::future<int> calculateEntityMovements = threadPool.Submit(std::bind(&CalculateEntityMovements, &world, &testProfiler));
+			gameTaskFutures.push_back(std::move(calculateEntityMovements));
 
 
 
