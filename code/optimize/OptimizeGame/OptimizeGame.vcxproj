@@ -164,7 +164,10 @@
     <ClCompile Include="GO_Entity.cpp" />
     <ClCompile Include="GO_EntityComponent.cpp" />
     <ClCompile Include="GO_GameInstance.cpp" />
+    <ClCompile Include="GO_GameStateChange.cpp" />
     <ClCompile Include="GO_HacksGlobalResources.cpp" />
+    <ClCompile Include="GO_MovementApplySystem.cpp" />
+    <ClCompile Include="GO_MovementCalculationSystem.cpp" />
     <ClCompile Include="GO_MovementComponent.cpp" />
     <ClCompile Include="GO_Profiler.cpp">
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AssemblyAndSourceCode</AssemblerOutput>
@@ -195,10 +198,13 @@
     <ClInclude Include="GO_Entity.h" />
     <ClInclude Include="GO_EntityComponent.h" />
     <ClInclude Include="GO_GameInstance.h" />
+    <ClInclude Include="GO_GameStateChange.h" />
     <ClInclude Include="GO_Gameworks.h" />
     <ClInclude Include="GO_HacksGlobalResources.h" />
     <ClInclude Include="GO_HealthComponent.h" />
     <ClInclude Include="GO_LockingThreadSafeQueue.h" />
+    <ClInclude Include="GO_MovementApplySystem.h" />
+    <ClInclude Include="GO_MovementCalculationSystem.h" />
     <ClInclude Include="GO_MovementComponent.h" />
     <ClInclude Include="GO_Profiler.h" />
     <ClInclude Include="GO_ProfilerRenderer.h" />
