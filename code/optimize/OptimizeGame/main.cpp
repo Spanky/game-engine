@@ -38,6 +38,9 @@ GO::Gameworks ourGameworks;
 sf::Time deltaTime;
 
 
+static_assert(sizeof(sf::Time) == sizeof(size_t), "Time is bigger than a native type and should be passed by reference");
+
+
 void drawFpsCounter(sf::RenderWindow& aWindow, const sf::Font& aFont, sf::Time aDeltaTime)
 {
 	sf::Text text;
