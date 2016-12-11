@@ -2,6 +2,9 @@
 
 #include <algorithm>
 
+#include "GO_MovementCalculationSystem.h"
+#include "GO_MovementApplySystem.h"
+
 #include "GO_AssertMutex.h"
 #include "GO_World.h"
 #include "GO_TaskScheduler.h"
@@ -33,6 +36,9 @@ const int Int64TextWidth = 20;
 GO::Gameworks ourGameworks;
 
 sf::Time deltaTime;
+
+
+static_assert(sizeof(sf::Time) == sizeof(size_t), "Time is bigger than a native type and should be passed by reference");
 
 
 void drawFpsCounter(sf::RenderWindow& aWindow, const sf::Font& aFont, sf::Time aDeltaTime)
@@ -246,13 +252,7 @@ struct EntitySpawnMessage
 {
 };
 
-struct MovementMessage
-{
-	GO::Entity* myEntityToMove;
-	sf::Vector2i myTileToMoveTo;
-};
 
-std::vector<MovementMessage> ourMovementMessages;
 std::vector<CombatDamageMessage> ourCombatDamageMessages;
 std::vector<EntityDeathMessage> ourEntityDeathMessages;
 std::vector<EntitySpawnMessage> ourEntitySpawnMessages;
@@ -270,14 +270,6 @@ float DistanceBetweenEntities(const GO::Entity* aLHS, const GO::Entity* aRHS)
 
 namespace GameEvents
 {
-	void QueueMovement(GO::Entity* anEntityToMove, const sf::Vector2i& aTileIndexToMoveTo)
-	{
-		MovementMessage msg;
-		msg.myEntityToMove = anEntityToMove;
-		msg.myTileToMoveTo = aTileIndexToMoveTo;
-		ourMovementMessages.push_back(msg);
-	}
-
 	void QueueDamage(GO::Entity* aDealer, GO::Entity* aReceiver, const float aDamageDone)
 	{
 		CombatDamageMessage msg;
@@ -305,45 +297,12 @@ namespace GameEvents
 	}
 }
 
-int UpdatePlayerInput(GO::World* aWorld, GO_APIProfiler* aProfiler, GO::Entity* aPlayerEntity)
+int CalculateEntityMovements(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
 	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
-	
-	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space))
-	{
-		GameEvents::QueueEntityForSpawn();
-	}
 
-	GO::MovementComponent* movementComponent = aPlayerEntity->getComponent<GO::MovementComponent>();
-
-	if(!movementComponent->myHasMovementQueued)
-	{
-		sf::Vector2i desiredTile = movementComponent->myCurrentTileIndex;
-
-		if(sf::Keyboard::isKeyPressed(sf::Keyboard::W))
-		{
-			desiredTile.y--;
-		}
-		else if(sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-		{
-			desiredTile.y++;
-		}
-		else if(sf::Keyboard::isKeyPressed(sf::Keyboard::D))
-		{
-			desiredTile.x++;
-		}
-		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
-		{
-			desiredTile.x--;
-		}
-
-
-		if(desiredTile != movementComponent->myCurrentTileIndex)
-		{
-			GameEvents::QueueMovement(aPlayerEntity, desiredTile);
-		}
-	}
-	
+	GO::MovementCalculationSystem movementCalcSystem(*aWorld);
+	movementCalcSystem.GenerateCalculations();
 
 	return 1;
 }
@@ -370,67 +329,6 @@ int CalculateCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
 			{
 				GameEvents::QueueDamage(outerEntity, innerEntity, 1.0f);
 				GameEvents::QueueDamage(innerEntity, outerEntity, 1.0f);
-			}
-		}
-	}
-
-	return 1;
-}
-
-int RandomlyMoveEntities(GO::World* aWorld, GO_APIProfiler* aProfiler)
-{
-	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
-
-	const GO::World::EntityList& entityList = aWorld->getEntities();
-	const size_t entityListSize = entityList.size();
-
-
-	// TODO: Figure out how to do random numbers better
-	// Seed with a real random value, if available
-	std::random_device r;
-
-	// Choose a random mean between 0 and 1
-	std::default_random_engine e1(r());
-	std::uniform_int_distribution<int> uniform_dist(0, 1);
-
-
-	for (size_t outerIndex = 0; outerIndex < entityListSize; outerIndex++)
-	{
-		GO::Entity* outerEntity = entityList[outerIndex];
-		GO_ASSERT(outerEntity, "Entity list contains a nullptr");
-
-		if(const GO::RandomMovementComponent* randomMovement = outerEntity->getComponent<GO::RandomMovementComponent>())
-		{
-			const GO::MovementComponent* movementComponent = outerEntity->getComponent<GO::MovementComponent>();
-			GO_ASSERT(movementComponent, "A randomly moving entity requires a movement component to perform the movement");
-
-			if(!movementComponent->myHasMovementQueued)
-			{
-				int x = uniform_dist(e1);
-				int y = uniform_dist(e1);
-
-				sf::Vector2i desiredTile = movementComponent->myCurrentTileIndex;
-
-				int directionSelection = uniform_dist(e1);
-
-				if(x && y)
-				{
-					if (directionSelection)
-					{
-						desiredTile.x += x;
-					}
-					else
-					{
-						desiredTile.y += y;
-					}
-				}
-				else
-				{
-					desiredTile.x += x;
-					desiredTile.y += y;
-				}
-
-				GameEvents::QueueMovement(outerEntity, desiredTile);
 			}
 		}
 	}
@@ -511,64 +409,13 @@ int ApplyEntitySpawns(GO::World* aWorld, GO_APIProfiler* aProfiler)
 	return 1;
 }
 
-sf::Vector2i LerpTiles(const sf::Vector2i& aCurrentTile, const sf::Vector2i& aDestinationTile, const float aLerpCursor)
-{
-	sf::Vector2f startPosition = sf::Vector2f(32.0f * aCurrentTile.x, 32.0f * aCurrentTile.y);
-	sf::Vector2f endPosition = sf::Vector2f(32.0f * aDestinationTile.x, 32.0f * aDestinationTile.y);
-
-	sf::Vector2f interpPosition(
-		startPosition.x + aLerpCursor * (endPosition.x - startPosition.x),
-		startPosition.y + aLerpCursor * (endPosition.y - startPosition.y));
-
-	sf::Vector2i position = sf::Vector2i(interpPosition.x, interpPosition.y);
-	return position;
-}
-
 int ApplyEntityMovement(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
 	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 
-	// Process all of our messages before we update the actual movement
-	for(const MovementMessage& movementMsg : ourMovementMessages)
-	{
-		GO::MovementComponent* movementComponent = movementMsg.myEntityToMove->getComponent<GO::MovementComponent>();
+	GO::MovementApplySystem movementSystem(*aWorld);
+	movementSystem.ApplyPendingMovementChanges(deltaTime);
 
-		GO_ASSERT(movementComponent, "Entity received a movement message but has no movement component");
-		GO_ASSERT(!movementComponent->myHasMovementQueued, "Entity already has a movement request outstanding");
-		movementComponent->myHasMovementQueued = true;
-
-		movementComponent->myDestinationTileIndex = movementMsg.myTileToMoveTo;
-	}
-
-	// TODO: We should probably be able to keep a list of entities that we know are moving so we don't have to
-	//		 constantly check all entities in the world
-	const GO::World::EntityList& entityList = aWorld->getEntities();
-	const size_t entityListSize = entityList.size();
-
-	for (size_t entityIndex = 0; entityIndex < entityListSize; entityIndex++)
-	{
-		GO::Entity* currentEntity = entityList[entityIndex];
-		GO::MovementComponent* movementComponent = currentEntity->getComponent<GO::MovementComponent>();
-		if(movementComponent)
-		{
-			if(movementComponent->myHasMovementQueued)
-			{
-				movementComponent->myTileMovementCursor += (0.5f / deltaTime.asMilliseconds());
-
-				sf::Vector2i lerpedPosition = LerpTiles(movementComponent->myCurrentTileIndex, movementComponent->myDestinationTileIndex, movementComponent->myTileMovementCursor);
-				currentEntity->setPosition(lerpedPosition);
-
-				if(movementComponent->myTileMovementCursor >= 1.0f)
-				{
-					movementComponent->myTileMovementCursor = 0;
-					movementComponent->myCurrentTileIndex = movementComponent->myDestinationTileIndex;
-					movementComponent->myHasMovementQueued = false;
-				}
-			}
-		}
-	}
-
-	ourMovementMessages.clear();
 	return 1;
 }
 
@@ -688,13 +535,6 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	}
 
 
-	bool canMoveRight = true;
-	bool canMoveLeft = true;
-
-	bool canMoveUp = true;
-	bool canMoveDown = true;
-
-
 #if PROFILER_ENABLED
 	GO_APIProfiler testProfiler;
 #endif	// #if PROFILER_ENABLED
@@ -758,11 +598,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			std::future<int> calculateCombatDamage = threadPool.Submit(std::bind(&CalculateCombatDamage, &world, &testProfiler));
 			gameTaskFutures.push_back(std::move(calculateCombatDamage));
 
-			std::future<int> randomlyMoveEntities = threadPool.Submit(std::bind(&RandomlyMoveEntities, &world, &testProfiler));
-			gameTaskFutures.push_back(std::move(randomlyMoveEntities));
-
-			std::future<int> updatePlayerInput = threadPool.Submit(std::bind(&UpdatePlayerInput, &world, &testProfiler, playerEntity));
-			gameTaskFutures.push_back(std::move(updatePlayerInput));
+			std::future<int> calculateEntityMovements = threadPool.Submit(std::bind(&CalculateEntityMovements, &world, &testProfiler));
+			gameTaskFutures.push_back(std::move(calculateEntityMovements));
 
 
 
@@ -811,79 +648,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		}
 
 
-		//if (canMoveRight)
-		//{
-		//	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-		//	{
-		//		canMoveRight = false;
-
-		//		playerPosition += sf::Vector2f(100.0f, 0.0f);
-		//		propMatrix.setCenter(playerPosition);
-		//	}
-		//}
-		//else
-		//{
-		//	if(!sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-		//	{
-		//		canMoveRight = true;
-		//	}
-		//}
-
-		//if (canMoveLeft)
-		//{
-		//	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-		//	{
-		//		canMoveLeft = false;
-
-		//		playerPosition -= sf::Vector2f(100.0f, 0.0f);
-		//		propMatrix.setCenter(playerPosition);
-		//	}
-		//}
-		//else
-		//{
-		//	if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-		//	{
-		//		canMoveLeft = true;
-		//	}
-		//}
-
-
-
-		//if (canMoveDown)
-		//{
-		//	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-		//	{
-		//		canMoveDown = false;
-
-		//		playerPosition += sf::Vector2f(0.0f, 100.0f);
-		//		propMatrix.setCenter(playerPosition);
-		//	}
-		//}
-		//else
-		//{
-		//	if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-		//	{
-		//		canMoveDown = true;
-		//	}
-		//}
-
-		//if (canMoveUp)
-		//{
-		//	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-		//	{
-		//		canMoveUp = false;
-
-		//		playerPosition -= sf::Vector2f(0.0f, 100.0f);
-		//		propMatrix.setCenter(playerPosition);
-		//	}
-		//}
-		//else
-		//{
-		//	if (!sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-		//	{
-		//		canMoveUp = true;
-		//	}
-		//}
+		
 
 
 		//propMatrix.debugDraw();

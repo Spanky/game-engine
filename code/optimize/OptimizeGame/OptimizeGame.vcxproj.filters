@@ -58,6 +58,12 @@
     <Filter Include="Containers\Lockless">
       <UniqueIdentifier>{6ca8beed-ceaa-48bd-a961-783a75eece17}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Entity Systems\Systems">
+      <UniqueIdentifier>{69d56498-fc55-4d34-87b0-2b99447268ba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Gameplay\Game State">
+      <UniqueIdentifier>{c1470f0d-86b2-4406-81ee-86ac6a935484}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -125,6 +131,15 @@
     </ClCompile>
     <ClCompile Include="GO_MovementComponent.cpp">
       <Filter>Entity Systems\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_MovementCalculationSystem.cpp">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_GameStateChange.cpp">
+      <Filter>Gameplay\Game State</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_MovementApplySystem.cpp">
+      <Filter>Entity Systems\Systems</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -211,6 +226,15 @@
     </ClInclude>
     <ClInclude Include="GO_ThreadSafeQueue.h">
       <Filter>Containers\Lockless</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_MovementCalculationSystem.h">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_GameStateChange.h">
+      <Filter>Gameplay\Game State</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_MovementApplySystem.h">
+      <Filter>Entity Systems\Systems</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
