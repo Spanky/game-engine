@@ -419,8 +419,7 @@ int ApplyEntityMovement(GO::World* aWorld, GO_APIProfiler* aProfiler)
 	return 1;
 }
 
-
-int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+void RunGame()
 {
 	TestFrameProcessor();
 
@@ -730,6 +729,4 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 	delete heapPropMatrix;
 	heapPropMatrix = nullptr;
-
-	return 0;
 }
