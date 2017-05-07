@@ -236,5 +236,8 @@
     <ClInclude Include="GO_MovementApplySystem.h">
       <Filter>Entity Systems\Systems</Filter>
     </ClInclude>
+    <ClInclude Include="main.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
