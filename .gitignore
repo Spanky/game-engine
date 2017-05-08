@@ -1,6 +1,7 @@
 code/build_build/
 code/build_output/
 code/optimize/ipch/
+code/optimize/\.vs/
 *.opensdf
 *.sdf
 *.suo
