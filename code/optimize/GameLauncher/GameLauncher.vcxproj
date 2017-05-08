@@ -74,7 +74,7 @@
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>..\OptimizeGame;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\build_build\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)..\build_output\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\build_output\$(Platform)\$(Configuration)\GameLauncher\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -83,7 +83,7 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>..\OptimizeGame;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\build_build\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)..\build_output\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>$(SolutionDir)..\build_output\$(Platform)\$(Configuration)\GameLauncher\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
