@@ -23,11 +23,19 @@ namespace GO
 
 			myWorkQueue.Push(std::move(task));
 
+			// TODO(scarroll): Without this, we are getting asserts in the profiler rendering code which need to be investigated
+			//					GO_ASSERT(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
+			std::lock_guard<std::mutex> lock(myHasWorkMutex);
+			myWakeWorkerThreadConditional.notify_one();
+
 			return res;
 		}
 
 	private:
 		void WorkerThread();
+
+		mutable std::mutex myHasWorkMutex;
+		std::condition_variable myWakeWorkerThreadConditional;
 
 	private:
 		// NOTE: The order of these members matters. The thread joiner must be last as it cannot

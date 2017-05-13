@@ -66,10 +66,13 @@ namespace GO_ProfilerRenderer
 		switch (aThreadTag)
 		{
 			// NOTE: This is the 'unknown' case and we should really be pushing something on here
+			// 0xRRGGBBAA
 		case GO_ProfilerTags::THREAD_TAG_UNKNOWN:
 			return sf::Color(0xffffffff);
 		case GO_ProfilerTags::THREAD_TAG_WAITING:
-			return sf::Color(0x00000000);
+			return sf::Color(0xffffff99);
+		case GO_ProfilerTags::THREAD_TAG_OVERHEAD:
+			return sf::Color(0xff4499ff);
 		case GO_ProfilerTags::THREAD_TAG_TASK_SCHEDULER:
 			return sf::Color(0xffff00ff);
 		case GO_ProfilerTags::THREAD_TAG_PROPAGATION:
@@ -85,7 +88,7 @@ namespace GO_ProfilerRenderer
 		case GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK:
 			return sf::Color(0x0000ffff);
 		default:
-			return sf::Color(0xff00ffff);
+			return sf::Color(0xffffffff);
 		}
 	}
 

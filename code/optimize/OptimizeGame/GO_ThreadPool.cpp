@@ -1,12 +1,9 @@
 #include "StableHeaders.h"
 #include "GO_ThreadPool.h"
 #include "GO_Profiler.h"
+#include "GO_ProfilerTags.h"
 
 #include <memory>
-
-// TODO: Move these to a common tag setup somewhere
-const unsigned char THREAD_TAG_UNKNOWN = 0;
-const unsigned char THREAD_TAG_WAITING = 1;
 
 namespace GO
 {
@@ -25,16 +22,16 @@ namespace GO
 
 	ThreadPool::~ThreadPool()
 	{
+		// Notify all threads that we want them to shutdown
 		myIsDone = true;
+		myWakeWorkerThreadConditional.notify_all();
+
 		// NOTE: The destructor of the thread joiner prevents this method from exiting until all threads are terminated
 	}
 
 	void ThreadPool::WorkerThread()
 	{
-		bool hasPushedWaitingEvent = false;
-
-		myProfiler->PushThreadEvent(THREAD_TAG_WAITING);
-
+		myProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_OVERHEAD);
 
 		while(!myIsDone)
 		{
@@ -51,35 +48,20 @@ namespace GO
 				//		 and the main thread starts running now. We need to find a way to push this
 				//		 event on without getting swapped out (we will show longer than we actually
 				//		 were)
-				myProfiler->PushThreadEvent(THREAD_TAG_WAITING);
-				hasPushedWaitingEvent = false;
+				myProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_OVERHEAD);
 			}
 			else
 			{
-				if(!hasPushedWaitingEvent)
-				{
-					myProfiler->PushThreadEvent(THREAD_TAG_WAITING);
-					hasPushedWaitingEvent = true;
-				}
+				myProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
 
-				//std::this_thread::yield();
-
-				// TODO: We have no way to break out of this. We should really be waiting on a condition here
-				// that we can raise from somewhere else
-				myWorkQueue.WaitAndPop(task);
-
-				// TODO: We should be grabbing the current threads tag and storing that
-				//		 internally when we actually submit a task into the system. At
-				//		 that point we can assert that we have a valid thread tag so that
-				//		 no one can schedule a task without a proper tag
-				task();
+				std::unique_lock<std::mutex> lock(myHasWorkMutex);
+				myWakeWorkerThreadConditional.wait(lock, [this] { return myIsDone || !myWorkQueue.IsEmpty(); });
 
 				// TODO: We may get context swapped out here since all of our futures are complete
 				//		 and the main thread starts running now. We need to find a way to push this
 				//		 event on without getting swapped out (we will show longer than we actually
 				//		 were)
-				myProfiler->PushThreadEvent(THREAD_TAG_WAITING);
-				hasPushedWaitingEvent = false;
+				myProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_OVERHEAD);
 			}
 		}
 
