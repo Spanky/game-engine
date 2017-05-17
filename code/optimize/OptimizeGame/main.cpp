@@ -8,6 +8,7 @@
 #include "GO_AssertMutex.h"
 #include "GO_World.h"
 #include "GO_TaskScheduler.h"
+#include "GO_TaskSchedulerNew.h"
 #include "GO_Entity.h"
 #include "GO_GameInstance.h"
 #include "GO_Gameworks.h"
@@ -336,7 +337,7 @@ int CalculateCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
 	return 1;
 }
 
-int ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
+void ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
 	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 
@@ -361,10 +362,9 @@ int ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
 	}
 
 	ourCombatDamageMessages.clear();
-	return 1;
 }
 
-int ApplyEntityDeaths(GO::World* aWorld, GO_APIProfiler* aProfiler)
+void ApplyEntityDeaths(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
 	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 
@@ -389,11 +389,9 @@ int ApplyEntityDeaths(GO::World* aWorld, GO_APIProfiler* aProfiler)
 	}
 
 	ourEntityDeathMessages.clear();
-
-	return 1;
 }
 
-int ApplyEntitySpawns(GO::World* aWorld, GO_APIProfiler* aProfiler)
+void ApplyEntitySpawns(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
 	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 
@@ -406,18 +404,28 @@ int ApplyEntitySpawns(GO::World* aWorld, GO_APIProfiler* aProfiler)
 	}
 
 	ourEntitySpawnMessages.clear();
-	return 1;
 }
 
-int ApplyEntityMovement(GO::World* aWorld, GO_APIProfiler* aProfiler)
+void ApplyEntityMovement(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
 	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 
 	GO::MovementApplySystem movementSystem(*aWorld);
 	movementSystem.ApplyPendingMovementChanges(deltaTime);
-
-	return 1;
 }
+
+
+
+
+enum class TaskIdentifiers : unsigned int
+{
+	ApplyCombatDamage,
+	ApplyEntityDeaths,
+	ApplyEntitySpawns,
+	ApplyEntityMovement,
+	MaxNumberTasks
+};
+
 
 void RunGame()
 {
@@ -614,35 +622,21 @@ void RunGame()
 			PROFILER_SCOPED(&testProfiler, "Apply Game Step", 0x00ff00ff);
 
 			{
-				std::future<int> applyCombatDamage = threadPool.Submit(std::bind(&ApplyCombatDamage, &world, &testProfiler));
-
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
-				applyCombatDamage.get();
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-			}
-
-			{
-				std::future<int> applyDeaths = threadPool.Submit(std::bind(&ApplyEntityDeaths, &world, &testProfiler));
+				GO::TaskSchedulerNew  scheduler(threadPool, unsigned int(TaskIdentifiers::MaxNumberTasks), &testProfiler);
 				
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
-				applyDeaths.get();
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-			}
+				GO::Task combatDamageTask(unsigned int(TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, &world, &testProfiler), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				scheduler.addTask(combatDamageTask);
 
-			{
-				std::future<int> applySpawns = threadPool.Submit(std::bind(&ApplyEntitySpawns, &world, &testProfiler));
+				GO::Task entityDeathTask(unsigned int(TaskIdentifiers::ApplyEntityDeaths), std::bind(&ApplyEntityDeaths, &world, &testProfiler), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				scheduler.addTask(entityDeathTask, unsigned int(TaskIdentifiers::ApplyCombatDamage));
 
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
-				applySpawns.get();
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-			}
+				GO::Task entitySpawnTask(unsigned int(TaskIdentifiers::ApplyEntitySpawns), std::bind(&ApplyEntitySpawns, &world, &testProfiler), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				scheduler.addTask(entitySpawnTask, unsigned int(TaskIdentifiers::ApplyEntityDeaths));
 
-			{
-				std::future<int> applyMovements = threadPool.Submit(std::bind(&ApplyEntityMovement, &world, &testProfiler));
+				GO::Task entityMovementTask(unsigned int(TaskIdentifiers::ApplyEntityMovement), std::bind(&ApplyEntityMovement, &world, &testProfiler), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				scheduler.addTask(entityMovementTask, unsigned int(TaskIdentifiers::ApplyEntitySpawns));
 
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
-				applyMovements.get();
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
+				scheduler.runPendingTasks();
 			}
 		}
 

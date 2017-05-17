@@ -64,6 +64,9 @@
     <Filter Include="Gameplay\Game State">
       <UniqueIdentifier>{c1470f0d-86b2-4406-81ee-86ac6a935484}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Threading\Task System">
+      <UniqueIdentifier>{4fd1ee46-b595-446a-9178-4bf160d57e72}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -140,6 +143,9 @@
     </ClCompile>
     <ClCompile Include="GO_MovementApplySystem.cpp">
       <Filter>Entity Systems\Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_TaskSchedulerNew.cpp">
+      <Filter>Threading\Task System</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -238,6 +244,9 @@
     </ClInclude>
     <ClInclude Include="main.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_TaskSchedulerNew.h">
+      <Filter>Threading\Task System</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
