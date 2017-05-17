@@ -80,6 +80,7 @@ namespace
 GO_APIProfiler::GO_APIProfiler()
 	: myStart(0)
 	, myPreviousFrameStartTime(0)
+	, myCurrentFrameStartTime(0)
 	, myProfilerOverhead(0)
 	, myCurrentNode(nullptr)
 	, myPreviousFrameRootNode(nullptr)
