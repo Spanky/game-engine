@@ -339,8 +339,6 @@ int CalculateCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
 
 void ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
-	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-
 	const GO::World::EntityList& entityList = aWorld->getEntities();
 	const size_t entityListSize = entityList.size();
 
@@ -366,8 +364,6 @@ void ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
 
 void ApplyEntityDeaths(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
-	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-
 	const GO::World::EntityList& entityList = aWorld->getEntities();
 
 	for(const EntityDeathMessage& deathMsg : ourEntityDeathMessages)
@@ -393,8 +389,6 @@ void ApplyEntityDeaths(GO::World* aWorld, GO_APIProfiler* aProfiler)
 
 void ApplyEntitySpawns(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
-	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-
 	for(const EntitySpawnMessage& spawnMsg : ourEntitySpawnMessages)
 	{
 		GO::Entity* entity = aWorld->createEntity();
@@ -408,8 +402,6 @@ void ApplyEntitySpawns(GO::World* aWorld, GO_APIProfiler* aProfiler)
 
 void ApplyEntityMovement(GO::World* aWorld, GO_APIProfiler* aProfiler)
 {
-	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-
 	GO::MovementApplySystem movementSystem(*aWorld);
 	movementSystem.ApplyPendingMovementChanges(deltaTime);
 }
@@ -637,6 +629,9 @@ void RunGame()
 				scheduler.addTask(entityMovementTask, unsigned int(TaskIdentifiers::ApplyEntitySpawns));
 
 				scheduler.runPendingTasks();
+
+				// TODO(scarroll): This is required because runPendingTasks does not store/reset when it changes the tag
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
 			}
 		}
 

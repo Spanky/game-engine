@@ -3,6 +3,7 @@
 
 #include "GO_ThreadPool.h"
 #include "GO_Profiler.h"
+#include "GO_ProfilerTags.h"
 
 namespace GO
 {
@@ -41,6 +42,8 @@ namespace GO
 		std::unique_lock<std::mutex> lock(myTaskCompleteMutex);
 		submitUnblockedTasks();
 
+		// TODO(scarroll): This should be a store/reset operation so the previous tag goes back on the profiler
+		myProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
 		myAllTasksCompletedCondition.wait(lock,
 			[this]
 		{
