@@ -701,6 +701,7 @@ void RunGame()
 				threadProfilerOffset += sf::Vector2f(0.0f, profilerSize.y + 150.0f);
 
 				GO_ProfilerRenderer::RenderThreadEvents(threadEvents, testProfiler.GetPreviousFrameStartTime(), frameTime, threadProfilerOffset, profilerSize, window);
+				GO_ProfilerRenderer::RenderThreadEventTitles(threadEvents, sf::Vector2f(130.0f, 475.0f), window);
 			}
 		}
 		testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);

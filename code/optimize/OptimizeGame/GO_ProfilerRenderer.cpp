@@ -2,9 +2,32 @@
 #include "GO_ProfilerRenderer.h"
 #include "GO_ProfilerTags.h"
 
+// TODO(scarroll): These are here to support getting the default font for the label rendering. Remove this dependency
+#include "GO_GameInstance.h"
+#include "GO_HacksGlobalResources.h"
+
 namespace GO_ProfilerRenderer
 {
 	const long long ourProfilerMergeTolerance = 1000;
+
+	struct ThreadSpecificEventInfo
+	{
+		long long myLastEventStartTime;
+		unsigned int myThreadIndex;
+		unsigned char myLastThreadTag;
+	};
+
+#pragma optimize("", off)
+	void ValidateProfilerThreadEvent(const ProfilerThreadEvent& aPTE, float aMainThreadTime, const ThreadSpecificEventInfo& aThreadSpecificInfo)
+	{
+		GO_ASSERT(aPTE.myThreadIndex == GetCurrentThreadIndex() || aPTE.myStartTime <= aMainThreadTime  || aThreadSpecificInfo.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
+		//if (!(aPTE.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1))
+		//{
+		//	int* test = nullptr;
+		//	(*test) = 5;
+		//}
+	}
+#pragma optimize("", on)
 
 	void RenderProfilerNode(long long aProfiledTime, const float aParentTotalTime, unsigned int aColor, const sf::Vector2f& aRegionSize, sf::Vector2f& aCurrentOffset, sf::RenderWindow& aWindow)
 	{
@@ -92,16 +115,40 @@ namespace GO_ProfilerRenderer
 		}
 	}
 
+	sf::String locGetThreadTagLabel(unsigned char aThreadTag)
+	{
+		switch (aThreadTag)
+		{
+			// NOTE: This is the 'unknown' case and we should really be pushing something on here
+			// 0xRRGGBBAA
+		case GO_ProfilerTags::THREAD_TAG_UNKNOWN:
+			return "Unknown";
+		case GO_ProfilerTags::THREAD_TAG_WAITING:
+			return "Waiting";
+		case GO_ProfilerTags::THREAD_TAG_OVERHEAD:
+			return "Overhead";
+		case GO_ProfilerTags::THREAD_TAG_TASK_SCHEDULER:
+			return "Task Scheduler";
+		case GO_ProfilerTags::THREAD_TAG_PROPAGATION:
+			return "Propagation";
+		case GO_ProfilerTags::THREAD_TAG_GAME_TASK:
+			return "Game Task";
+		case GO_ProfilerTags::THREAD_TAG_MAIN_THREAD:
+			return "Main Thread";
+		case GO_ProfilerTags::THREAD_TAG_PROFILER_RENDER:
+			return "Profiler Render:";
+		case GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK:
+			return "Calc Game Task";
+		case GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK:
+			return "Apply Game Task";
+		default:
+			return "Unknown";
+		}
+	}
+
 	void RenderThreadEvents(const std::vector<ProfilerThreadEvent>& someThreadEvents, const long long aFrameStartTime, const float aFrameDuration, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
 	{
 		GO_ASSERT(aFrameDuration != 0, "Previous frame must have a duration");
-
-		struct ThreadSpecificEventInfo
-		{
-			long long myLastEventStartTime;
-			unsigned int myThreadIndex;
-			unsigned char myLastThreadTag;
-		};
 
 		static std::vector<ThreadSpecificEventInfo> threadSpecificInfos;
 
@@ -177,12 +224,7 @@ namespace GO_ProfilerRenderer
 			// Skip elements that are under our tolerance to avoid creating tons of small rectangles. Merge them
 			// into one larger rectangle
 
-			GO_ASSERT(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
-			if (!(pte.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1))
-			{
-				int* test = nullptr;
-				(*test) = 5;
-			}
+			ValidateProfilerThreadEvent(pte, mainThreadTime, threadSpecific);
 
 			// TODO: The start time may be before this frame has actually started.
 			//		 This would indicate an event that was carried forward from the
@@ -288,6 +330,31 @@ namespace GO_ProfilerRenderer
 
 			aWindow.draw(profilerOutline);
 			numDrawn++;
+		}
+	}
+
+	void GO_ProfilerRenderer::RenderThreadEventTitles(const std::vector<ProfilerThreadEvent>& someThreadEvents, sf::Vector2f aStartingPosition, sf::RenderWindow& aWindow)
+	{
+		sf::Font& font = GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont();
+
+		for(unsigned char currentTag = 0; currentTag < GO_ProfilerTags::THREAD_TAG_COUNT; currentTag++)
+		{
+			sf::Text text;
+			text.setFont(font);
+			text.setCharacterSize(16);
+			text.setColor(locGetThreadTagColor(currentTag));
+			text.setPosition(aStartingPosition);
+
+			// TODO(scarroll): Use the proper font height to give nice line spacing in profiler labels
+			aStartingPosition.y += 16.0f;
+
+			//char buffer[16];
+			//_i64toa_s(currentTag, buffer, 16, 10);
+
+			text.setString(locGetThreadTagLabel(currentTag));
+			//text.setString(buffer);
+
+			aWindow.draw(text);
 		}
 	}
 }

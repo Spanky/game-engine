@@ -16,4 +16,7 @@ namespace GO_ProfilerTags
 	const unsigned char THREAD_TAG_GAME_TASK = 7;
 	const unsigned char THREAD_TAG_CALC_GAME_TASK = 8;
 	const unsigned char THREAD_TAG_APPLY_GAME_TASK = 9;
+
+	// NOTE: Update this each time the thread tags are updated
+	const unsigned char THREAD_TAG_COUNT = THREAD_TAG_APPLY_GAME_TASK + 1;
 }
