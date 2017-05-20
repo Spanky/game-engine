@@ -25,12 +25,14 @@ namespace GO
 		std::function<void()> myTask;
 		unsigned char myTaskTag;
 		bool myIsComplete;
+		bool myHasStarted;
 
 	public:
 		Task()
 			: myUniqueID(InvalidTaskUniqueID)
 			, myTaskTag(InvalidThreadTag)
 			, myIsComplete(true)
+			, myHasStarted(true)
 		{
 
 		}
@@ -39,6 +41,7 @@ namespace GO
 			, myTask(std::move(aFunction))
 			, myTaskTag(aTaskTag)
 			, myIsComplete(false)
+			, myHasStarted(false)
 		{
 		}
 
@@ -55,6 +58,16 @@ namespace GO
 		bool isComplete() const
 		{
 			return myIsComplete;
+		}
+
+		bool hasStarted() const
+		{
+			return myHasStarted;
+		}
+
+		void markAsStarted()
+		{
+			myHasStarted = true;
 		}
 
 		void operator()()

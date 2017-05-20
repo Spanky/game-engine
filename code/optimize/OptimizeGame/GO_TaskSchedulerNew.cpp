@@ -108,12 +108,13 @@ namespace GO
 	{
 		GO::AssertMutexLock assertLock(myTaskListAssertMutex);
 
-		for (unsigned int i = 0; i < myTaskDependencies.size(); i++)
+		for (unsigned int i = 0; i < myTasks.size(); i++)
 		{
 			Task& currentTask = myTasks[i];
 
-			if (!currentTask.isComplete() && myTasksBlockedByCounts[currentTask.getUniqueID()] == 0)
+			if (!currentTask.hasStarted() && !currentTask.isComplete() && myTasksBlockedByCounts[currentTask.getUniqueID()] == 0)
 			{
+				currentTask.markAsStarted();
 				myThreadPool.Submit(std::bind(&TaskSchedulerNew::runTaskInternal, this, &currentTask));
 			}
 		}
