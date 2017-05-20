@@ -108,6 +108,8 @@ namespace GO_ProfilerRenderer
 			return sf::Color(0xaa00ffff);
 		case GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK:
 			return sf::Color(0x00ff00ff);
+		case GO_ProfilerTags::THREAD_TAG_CALC_SYNC_POINT_TASK:
+			return sf::Color(0x33ee55ff);
 		case GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK:
 			return sf::Color(0x0000ffff);
 		default:

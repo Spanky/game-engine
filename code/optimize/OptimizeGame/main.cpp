@@ -39,6 +39,23 @@ GO::Gameworks ourGameworks;
 sf::Time deltaTime;
 
 
+struct SystemUpdateParams
+{
+	SystemUpdateParams(GO::World& aWorld, GO_APIProfiler& aProfiler, GO::ThreadPool& aThreadPool)
+		: myWorld(aWorld)
+		, myProfiler(aProfiler)
+		, myThreadPool(aThreadPool)
+	{
+	};
+
+	GO::World& myWorld;
+	GO_APIProfiler& myProfiler;
+	GO::ThreadPool& myThreadPool;
+};
+
+GO::AssertMutex ourCombatDamageMutex;
+
+
 static_assert(sizeof(sf::Time) == sizeof(size_t), "Time is bigger than a native type and should be passed by reference");
 
 
@@ -298,21 +315,17 @@ namespace GameEvents
 	}
 }
 
-int CalculateEntityMovements(GO::World* aWorld, GO_APIProfiler* aProfiler)
+void CalculateEntityMovements(SystemUpdateParams& someUpdateParams)
 {
-	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
-
-	GO::MovementCalculationSystem movementCalcSystem(*aWorld);
+	GO::MovementCalculationSystem movementCalcSystem(someUpdateParams.myWorld);
 	movementCalcSystem.GenerateCalculations();
-
-	return 1;
 }
 
-int CalculateCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
+void CalculateCombatDamage(SystemUpdateParams& someUpdateParams)
 {
-	aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
-
-	const GO::World::EntityList& entityList = aWorld->getEntities();
+	GO::AssertMutexLock lock(ourCombatDamageMutex);
+	GO::World& world = someUpdateParams.myWorld;
+	const GO::World::EntityList& entityList = world.getEntities();
 	const size_t entityListSize = entityList.size();
 
 	for(size_t outerIndex = 0; outerIndex < entityListSize; outerIndex++)
@@ -333,11 +346,9 @@ int CalculateCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler)
 			}
 		}
 	}
-
-	return 1;
 }
 
-void ApplyCombatDamageInternal(const size_t aStartIndex, const size_t anEndIndex, GO_APIProfiler* aProfiler)
+void ApplyCombatDamageInternal(const size_t aStartIndex, const size_t anEndIndex, GO_APIProfiler& aProfiler)
 {
 	for (size_t currentIndex = aStartIndex; currentIndex < anEndIndex; currentIndex++)
 	{
@@ -359,8 +370,13 @@ void ApplyCombatDamageInternal(const size_t aStartIndex, const size_t anEndIndex
 	}
 }
 
-void ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler, GO::ThreadPool* aThreadPool)
+void ApplyCombatDamage(const SystemUpdateParams& someUpdateParams)
 {
+	GO::AssertMutexLock lock(ourCombatDamageMutex);
+	GO::World& world = someUpdateParams.myWorld;
+	GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
+	GO_APIProfiler& profiler = someUpdateParams.myProfiler;
+
 	// TODO(scarroll): Get the number of tasks available from the thread pool
 	const unsigned int threadCount = std::thread::hardware_concurrency();
 
@@ -369,7 +385,7 @@ void ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler, GO::ThreadP
 	{
 		const size_t NumJobsPerThread = (ourCombatDamageMessages.size() + threadCount - 1) / threadCount;
 
-		const GO::World::EntityList& entityList = aWorld->getEntities();
+		const GO::World::EntityList& entityList = world.getEntities();
 		const size_t entityListSize = entityList.size();
 
 		std::atomic_size_t counter = 0;
@@ -382,11 +398,11 @@ void ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler, GO::ThreadP
 				const size_t startIndex = i * NumJobsPerThread;
 				const size_t endIndex = (i + 1) * NumJobsPerThread;
 
-				std::future<int> result = aThreadPool->Submit([&counter, aProfiler, startIndex, endIndex]() -> int
+				std::future<int> result = threadPool.Submit([&counter, &profiler, startIndex, endIndex]() -> int
 				{
 					// TODO: The thread tag should be automatically gathered from the same tag as the 'submit' event
-					aProfiler->PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-					ApplyCombatDamageInternal(startIndex, endIndex, aProfiler);
+					profiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+					ApplyCombatDamageInternal(startIndex, endIndex, profiler);
 
 					const size_t numProcessed = endIndex - startIndex;
 					return counter.fetch_add(numProcessed);
@@ -400,7 +416,7 @@ void ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler, GO::ThreadP
 			{
 				const size_t startIndex = (threadCount - 1) * NumJobsPerThread;
 				const size_t numProcessed = ourCombatDamageMessages.size() - startIndex;
-				ApplyCombatDamageInternal(startIndex, ourCombatDamageMessages.size(), aProfiler);
+				ApplyCombatDamageInternal(startIndex, ourCombatDamageMessages.size(), profiler);
 				counter.fetch_add(numProcessed);
 			}
 
@@ -417,15 +433,16 @@ void ApplyCombatDamage(GO::World* aWorld, GO_APIProfiler* aProfiler, GO::ThreadP
 	else
 	{
 		// Run everything locally since it's a small batch anyways
-		ApplyCombatDamageInternal(0, ourCombatDamageMessages.size(), aProfiler);
+		ApplyCombatDamageInternal(0, ourCombatDamageMessages.size(), profiler);
 	}
 
 	ourCombatDamageMessages.clear();
 }
 
-void ApplyEntityDeaths(GO::World* aWorld, GO_APIProfiler* aProfiler)
+void ApplyEntityDeaths(const SystemUpdateParams& someUpdateParams)
 {
-	const GO::World::EntityList& entityList = aWorld->getEntities();
+	GO::World& world = someUpdateParams.myWorld;
+	const GO::World::EntityList& entityList = world.getEntities();
 
 	for(const EntityDeathMessage& deathMsg : ourEntityDeathMessages)
 	{
@@ -441,18 +458,20 @@ void ApplyEntityDeaths(GO::World* aWorld, GO_APIProfiler* aProfiler)
 		// (Multiple things could have all killed this entity in the same frame)
 		if(deadIter != entityList.end())
 		{
-			aWorld->destroyEntity(*deadIter);
+			world.destroyEntity(*deadIter);
 		}
 	}
 
 	ourEntityDeathMessages.clear();
 }
 
-void ApplyEntitySpawns(GO::World* aWorld, GO_APIProfiler* aProfiler)
+void ApplyEntitySpawns(const SystemUpdateParams& someUpdateParams)
 {
+	GO::World& world = someUpdateParams.myWorld;
+
 	for(const EntitySpawnMessage& spawnMsg : ourEntitySpawnMessages)
 	{
-		GO::Entity* entity = aWorld->createEntity();
+		GO::Entity* entity = world.createEntity();
 		entity->createComponent<GO::SpriteComponent>();
 		entity->createComponent<GO::RandomMovementComponent>();
 		entity->createComponent<GO::HealthComponent>();
@@ -461,9 +480,9 @@ void ApplyEntitySpawns(GO::World* aWorld, GO_APIProfiler* aProfiler)
 	ourEntitySpawnMessages.clear();
 }
 
-void ApplyEntityMovement(GO::World* aWorld, GO_APIProfiler* aProfiler)
+void ApplyEntityMovement(const SystemUpdateParams& someUpdateParams)
 {
-	GO::MovementApplySystem movementSystem(*aWorld);
+	GO::MovementApplySystem movementSystem(someUpdateParams.myWorld);
 	movementSystem.ApplyPendingMovementChanges(deltaTime);
 }
 
@@ -472,12 +491,20 @@ void ApplyEntityMovement(GO::World* aWorld, GO_APIProfiler* aProfiler)
 
 enum class TaskIdentifiers : unsigned int
 {
+	CalculateCombat,
+	CalculateMovement,
+	CalculateFinished,
 	ApplyCombatDamage,
 	ApplyEntityDeaths,
 	ApplyEntitySpawns,
 	ApplyEntityMovement,
 	MaxNumberTasks
 };
+
+// An empty function used for the 'Noop' sync points in the task scheduler
+void Noop()
+{
+}
 
 
 void RunGame()
@@ -651,42 +678,38 @@ void RunGame()
 		}
 
 
+		GO::TaskSchedulerNew  scheduler(threadPool, unsigned int(TaskIdentifiers::MaxNumberTasks), &testProfiler);
+		SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool);
+
 		{
 			PROFILER_SCOPED(&testProfiler, "Calculate Game Step", 0xff0000ff);
-			std::vector<std::future<int>> gameTaskFutures;
+			
+			GO::Task calcDamageTask(unsigned int(TaskIdentifiers::CalculateCombat), std::bind(CalculateCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
+			scheduler.addTask(calcDamageTask);
 
-			std::future<int> calculateCombatDamage = threadPool.Submit(std::bind(&CalculateCombatDamage, &world, &testProfiler));
-			gameTaskFutures.push_back(std::move(calculateCombatDamage));
+			GO::Task calcMovementsTask(unsigned int(TaskIdentifiers::CalculateMovement), std::bind(CalculateEntityMovements, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
+			scheduler.addTask(calcMovementsTask);
 
-			std::future<int> calculateEntityMovements = threadPool.Submit(std::bind(&CalculateEntityMovements, &world, &testProfiler));
-			gameTaskFutures.push_back(std::move(calculateEntityMovements));
-
-
-
-			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
-			for(std::future<int>& currentGameTask : gameTaskFutures)
-			{
-				currentGameTask.get();
-			}
-			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
+			GO::Task noopTask(unsigned int(TaskIdentifiers::CalculateFinished), std::bind(Noop), GO_ProfilerTags::THREAD_TAG_CALC_SYNC_POINT_TASK);
+			scheduler.addTask(noopTask, unsigned int(TaskIdentifiers::CalculateCombat), unsigned int(TaskIdentifiers::CalculateMovement));
 		}
 
 		{
 			PROFILER_SCOPED(&testProfiler, "Apply Game Step", 0x00ff00ff);
 
 			{
-				GO::TaskSchedulerNew  scheduler(threadPool, unsigned int(TaskIdentifiers::MaxNumberTasks), &testProfiler);
+				SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool);
 				
-				GO::Task combatDamageTask(unsigned int(TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, &world, &testProfiler, &threadPool), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-				scheduler.addTask(combatDamageTask);
+				GO::Task combatDamageTask(unsigned int(TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				scheduler.addTask(combatDamageTask, unsigned int(TaskIdentifiers::CalculateFinished));
 
-				GO::Task entityDeathTask(unsigned int(TaskIdentifiers::ApplyEntityDeaths), std::bind(&ApplyEntityDeaths, &world, &testProfiler), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				GO::Task entityDeathTask(unsigned int(TaskIdentifiers::ApplyEntityDeaths), std::bind(&ApplyEntityDeaths, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 				scheduler.addTask(entityDeathTask, unsigned int(TaskIdentifiers::ApplyCombatDamage));
 
-				GO::Task entitySpawnTask(unsigned int(TaskIdentifiers::ApplyEntitySpawns), std::bind(&ApplyEntitySpawns, &world, &testProfiler), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				GO::Task entitySpawnTask(unsigned int(TaskIdentifiers::ApplyEntitySpawns), std::bind(&ApplyEntitySpawns, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 				scheduler.addTask(entitySpawnTask, unsigned int(TaskIdentifiers::ApplyEntityDeaths));
 
-				GO::Task entityMovementTask(unsigned int(TaskIdentifiers::ApplyEntityMovement), std::bind(&ApplyEntityMovement, &world, &testProfiler), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				GO::Task entityMovementTask(unsigned int(TaskIdentifiers::ApplyEntityMovement), std::bind(&ApplyEntityMovement, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 				scheduler.addTask(entityMovementTask, unsigned int(TaskIdentifiers::ApplyEntitySpawns));
 
 				scheduler.runPendingTasks();
