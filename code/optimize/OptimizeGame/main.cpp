@@ -675,11 +675,6 @@ void RunGame()
 			}
 		}
 
-		{
-			PROFILER_SCOPED(&testProfiler, "Clear Window", 0x00ff00ff);
-			window.clear();
-		}
-
 
 		GO::TaskSchedulerNew  scheduler(threadPool, unsigned int(TaskIdentifiers::MaxNumberTasks), &testProfiler);
 		SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool, window, gameInstance);
@@ -714,7 +709,10 @@ void RunGame()
 
 			GO::Task entityMovementTask(unsigned int(TaskIdentifiers::ApplyEntityMovement), std::bind(&ApplyEntityMovement, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 			scheduler.addTask(entityMovementTask, unsigned int(TaskIdentifiers::ApplyEntitySpawns));
+		}
 
+
+		{
 			scheduler.runPendingTasks();
 
 			// TODO(scarroll): This is required because runPendingTasks does not store/reset when it changes the tag
@@ -728,14 +726,22 @@ void RunGame()
 		//					and updating as fast as possible. It should not have data ties with
 		//					the current game state
 		{
-			GO::World::EntityList& entityList = world.getEntities();
-			for(size_t i = 0; i < entityList.size(); i++)
 			{
-				GO::Entity& currentEntity = *entityList[i];
-				GO::SpriteComponent* spriteComponent = currentEntity.getComponent<GO::SpriteComponent>();
-				if(spriteComponent)
+				PROFILER_SCOPED(&testProfiler, "Clear Window", 0x00ff00ff);
+				window.clear();
+			}
+
+			{
+				PROFILER_SCOPED(&testProfiler, "Render Sprites", 0x00ffffff);
+				GO::World::EntityList& entityList = world.getEntities();
+				for (size_t i = 0; i < entityList.size(); i++)
 				{
-					spriteComponent->render(window);
+					GO::Entity& currentEntity = *entityList[i];
+					GO::SpriteComponent* spriteComponent = currentEntity.getComponent<GO::SpriteComponent>();
+					if (spriteComponent)
+					{
+						spriteComponent->render(window);
+					}
 				}
 			}
 		}
