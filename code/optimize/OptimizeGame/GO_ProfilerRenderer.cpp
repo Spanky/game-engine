@@ -12,15 +12,21 @@ namespace GO_ProfilerRenderer
 
 	struct ThreadSpecificEventInfo
 	{
+		ThreadSpecificEventInfo()
+			: myLastEventStartTime(-1)
+			, myThreadIndex(std::numeric_limits<unsigned int>::max())
+			, myLastThreadTag(std::numeric_limits<unsigned char>::max())
+		{
+		}
 		long long myLastEventStartTime;
 		unsigned int myThreadIndex;
 		unsigned char myLastThreadTag;
 	};
 
 #pragma optimize("", off)
-	void ValidateProfilerThreadEvent(const ProfilerThreadEvent& aPTE, float aMainThreadTime, const ThreadSpecificEventInfo& aThreadSpecificInfo)
+	void ValidateProfilerThreadEvent(const ProfilerThreadEvent& aPTE, long long aFrameEndTime, const ThreadSpecificEventInfo& aThreadSpecificInfo)
 	{
-		GO_ASSERT(aPTE.myThreadIndex == GetCurrentThreadIndex() || aPTE.myStartTime <= aMainThreadTime  || aThreadSpecificInfo.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
+		GO_ASSERT(aPTE.myThreadIndex == GetCurrentThreadIndex() || aPTE.myStartTime <= aFrameEndTime  || aThreadSpecificInfo.myLastThreadTag <= 1, "An event went beyond the 'main' we are done event");
 		//if (!(aPTE.myThreadIndex == GetCurrentThreadIndex() || pte.myStartTime <= mainThreadTime || threadSpecific.myLastThreadTag <= 1))
 		//{
 		//	int* test = nullptr;
@@ -93,7 +99,7 @@ namespace GO_ProfilerRenderer
 		case GO_ProfilerTags::THREAD_TAG_UNKNOWN:
 			return sf::Color(0xffffffff);
 		case GO_ProfilerTags::THREAD_TAG_WAITING:
-			return sf::Color(0xffffff99);
+			return sf::Color(0xff000099);
 		case GO_ProfilerTags::THREAD_TAG_OVERHEAD:
 			return sf::Color(0xff4499ff);
 		case GO_ProfilerTags::THREAD_TAG_TASK_SCHEDULER:
@@ -148,9 +154,10 @@ namespace GO_ProfilerRenderer
 		}
 	}
 
-	void RenderThreadEvents(const std::vector<ProfilerThreadEvent>& someThreadEvents, const long long aFrameStartTime, const float aFrameDuration, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
+	void RenderThreadEvents(const std::vector<ProfilerThreadEvent>& someThreadEvents, const long long aFrameStartTime, const long long aFrameEndTime, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
 	{
-		GO_ASSERT(aFrameDuration != 0, "Previous frame must have a duration");
+		const long long frameDuration = aFrameEndTime - aFrameStartTime;
+		GO_ASSERT(frameDuration > 0, "Previous frame must have a duration");
 
 		static std::vector<ThreadSpecificEventInfo> threadSpecificInfos;
 
@@ -169,28 +176,16 @@ namespace GO_ProfilerRenderer
 		aWindow.draw(profilerOutline);
 
 
+		// Reset all of our thread infos that we know about since we are starting a new frame
+		for (size_t lookupIndex = 0; lookupIndex < threadSpecificInfos.size(); lookupIndex++)
+		{
+			auto& tsi = threadSpecificInfos[lookupIndex];
+			tsi.myLastEventStartTime = aFrameStartTime;
+			// TODO(scarroll): Validate that the tags are all set to idle perhaps?
+			//tsi.myLastThreadTag = GO_ProfilerTags::THREAD_TAG_IDLE;
+		}
 
 		unsigned int numDrawn = 0;
-
-
-		long long mainThreadTime = 0;
-		int numMainThreadEvents = 0;
-		for (size_t i = someThreadEvents.size() - 1; i >= 0; i--)
-		{
-			if (someThreadEvents[i].myThreadIndex == GetCurrentThreadIndex())
-			{
-				numMainThreadEvents++;
-
-				// TODO: Hard-coded number of events to reverse to find the last 'valid' marker
-				if (numMainThreadEvents == 4)
-				{
-					mainThreadTime = someThreadEvents[i].myStartTime;
-					break;
-				}
-			}
-		}
-		GO_ASSERT(mainThreadTime != 0, "Could not locate 4th last main thread event");
-
 		for (const ProfilerThreadEvent& pte : someThreadEvents)
 		{
 			GO_ASSERT(pte.myStartTime >= aFrameStartTime, "Received an event that started before the frame did");
@@ -215,7 +210,7 @@ namespace GO_ProfilerRenderer
 				ThreadSpecificEventInfo& newThreadInfo = threadSpecificInfos[lookupIndex];
 				newThreadInfo.myThreadIndex = pte.myThreadIndex;
 				newThreadInfo.myLastEventStartTime = aFrameStartTime;
-				newThreadInfo.myLastThreadTag = GO_ProfilerTags::THREAD_TAG_WAITING;
+				newThreadInfo.myLastThreadTag = GO_ProfilerTags::THREAD_TAG_IDLE;
 			}
 
 			ThreadSpecificEventInfo& threadSpecific = threadSpecificInfos[lookupIndex];
@@ -226,38 +221,49 @@ namespace GO_ProfilerRenderer
 			// Skip elements that are under our tolerance to avoid creating tons of small rectangles. Merge them
 			// into one larger rectangle
 
-			ValidateProfilerThreadEvent(pte, mainThreadTime, threadSpecific);
+			ValidateProfilerThreadEvent(pte, aFrameEndTime, threadSpecific);
 
 			// TODO: The start time may be before this frame has actually started.
 			//		 This would indicate an event that was carried forward from the
 			//		 previous frame
-			const long long eventStartTime = std::max<long long>(0, threadSpecific.myLastEventStartTime - aFrameStartTime);
+			const long long eventStartTime = threadSpecific.myLastEventStartTime - aFrameStartTime;
 			const long long eventEndTime = pte.myStartTime - aFrameStartTime;
 
-			const float relativeEventStartTime = GO_APIProfiler::TicksToMilliseconds(eventStartTime);
-			//const float relativeEventEndTime = GO_APIProfiler::TicksToMilliseconds(eventEndTime);
+			GO_ASSERT(eventStartTime >= 0, "Event started before the frame and this is currently unsupported");
+			GO_ASSERT(eventEndTime >= 0, "Event ended before our frame started");
+			GO_ASSERT(eventEndTime <= frameDuration, "Event ended after the frame it was contained in did");
 
 			const long long eventDuration = eventEndTime - eventStartTime;
 			GO_ASSERT(eventDuration >= 0, "The event took 'negative' time");
 
 			// Skip over any that can be merged together
+			// TODO(scarroll): We need to keep track of the 'current' end time so that we can compare to a moving end point for merging
 			if (pte.myThreadTag == threadSpecific.myLastThreadTag &&
 				(pte.myStartTime - threadSpecific.myLastEventStartTime) < ourProfilerMergeTolerance)
 			{
 				continue;
 			}
 
+			const double eventLengthPercentage = (eventDuration / (float)frameDuration);
+			GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as taking negative percent of a frame");
+			GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as taking more than 100% of a frame");
+
+			const double eventStartPercentage = (eventStartTime / (float)frameDuration);
+			GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as starting before a frame");
+			GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as starting after a frame");
+
 			sf::Vector2f rectSize;
-			rectSize.x = aRegionSize.x * (GO_APIProfiler::TicksToMilliseconds(eventDuration) / aFrameDuration);
+			rectSize.x = aRegionSize.x * eventLengthPercentage;
 			rectSize.y = 10.0f;
 
 			sf::Vector2f rectPosition;
-			rectPosition.x = aStartingPosition.x + (aRegionSize.x * (relativeEventStartTime / aFrameDuration));
+			rectPosition.x = aStartingPosition.x + (aRegionSize.x * eventStartPercentage);
 			rectPosition.y = aStartingPosition.y + (threadSpecific.myThreadIndex * 15.0f);
 
 			GO_ASSERT(rectPosition.x >= aStartingPosition.x, "The event will be drawn before the timeline");
 			GO_ASSERT(rectSize.x >= 0.0f, "The event will be drawn with negative size");
 			GO_ASSERT(rectPosition.x <= aStartingPosition.x + aRegionSize.x, "Bar goes beyond the bounds given to us");
+			//GO_ASSERT((rectPosition.x + rectSize.x) <= (aStartingPosition.x + aRegionSize.x), "Bar extends beyond the bounds of the profiler display");
 
 			sf::RectangleShape profilerOutline(rectSize);
 			profilerOutline.setPosition(rectPosition);
@@ -272,12 +278,6 @@ namespace GO_ProfilerRenderer
 			threadSpecific.myLastThreadTag = pte.myThreadTag;
 		}
 
-		if (numDrawn == 4123212313)
-		{
-			int* temp = nullptr;
-			(*temp) = 5;
-		}
-
 		// TODO: Render the last events for each of the threads
 		for (size_t lookupIndex = 0; lookupIndex < threadSpecificInfos.size(); lookupIndex++)
 		{
@@ -290,39 +290,39 @@ namespace GO_ProfilerRenderer
 			//	// Since we are only storing the starting time of each event, we can't draw it until we encounter
 			//	// the next event on the time line.
 
-			const float endFrameTime = GO_APIProfiler::TicksToMilliseconds(aFrameStartTime) + aFrameDuration;
-			const float eventDuration = endFrameTime - GO_APIProfiler::TicksToMilliseconds(threadSpecific.myLastEventStartTime);
-
 			// TODO: The start time may be before this frame has actually started.
 			//		 This would indicate an event that was carried forward from the
 			//		 previous frame
-			//const long long eventStartTime = std::max<long long>(0, threadSpecific.myLastEventStartTime - aFrameStartTime);
-			//const long long eventEndTime =  - aFrameStartTime;
+			const long long eventStartTime = threadSpecific.myLastEventStartTime - aFrameStartTime;
+			const long long eventEndTime = aFrameEndTime - aFrameStartTime;
 
-			const float relativeEventStartTime = GO_APIProfiler::TicksToMilliseconds(threadSpecific.myLastEventStartTime);
-			//const float relativeEventEndTime = GO_APIProfiler::TicksToMilliseconds(eventEndTime);
+			GO_ASSERT(eventStartTime >= 0, "Event started before the frame and this is currently unsupported");
+			GO_ASSERT(eventEndTime >= 0, "Event ended before our frame started");
+			GO_ASSERT(eventEndTime <= frameDuration, "Event ended after the frame it was contained in did");
 
-			//const long long eventDuration = eventEndTime - eventStartTime;
+			const long long eventDuration = eventEndTime - eventStartTime;
 			GO_ASSERT(eventDuration >= 0, "The event took 'negative' time");
 
-			// Skip over any that can be merged together
-			//if (pte.myThreadTag == threadSpecific.myLastThreadTag &&
-			//	(pte.myStartTime - threadSpecific.myLastEventStartTime) < ourProfilerMergeTolerance)
-			//{
-			//	continue;
-			//}
+			const double eventLengthPercentage = (eventDuration / (float)frameDuration);
+			GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as taking negative percent of a frame");
+			GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as taking more than 100% of a frame");
+
+			const double eventStartPercentage = (eventStartTime / (float)frameDuration);
+			GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as starting before a frame");
+			GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as starting after a frame");
 
 			sf::Vector2f rectSize;
-			rectSize.x = aRegionSize.x * (eventDuration / aFrameDuration);
+			rectSize.x = aRegionSize.x * eventLengthPercentage;
 			rectSize.y = 10.0f;
 
 			sf::Vector2f rectPosition;
-			rectPosition.x = aStartingPosition.x + (aRegionSize.x * (relativeEventStartTime / aFrameDuration));
+			rectPosition.x = aStartingPosition.x + (aRegionSize.x * eventStartPercentage);
 			rectPosition.y = aStartingPosition.y + (threadSpecific.myThreadIndex * 15.0f);
 
 			GO_ASSERT(rectPosition.x >= aStartingPosition.x, "The event will be drawn before the timeline");
 			GO_ASSERT(rectSize.x >= 0.0f, "The event will be drawn with negative size");
-			GO_ASSERT(rectPosition.x <= aStartingPosition.x + aRegionSize.x, "Bar goes beyond the bounds given to us");
+			GO_ASSERT(rectPosition.x <= (aStartingPosition.x + aRegionSize.x), "Bar goes beyond the bounds given to us");
+			//GO_ASSERT((rectPosition.x + rectSize.x) <= (aStartingPosition.x + aRegionSize.x), "Bar extends beyond the bounds of the profiler display");
 
 			sf::RectangleShape profilerOutline(rectSize);
 			profilerOutline.setPosition(rectPosition);

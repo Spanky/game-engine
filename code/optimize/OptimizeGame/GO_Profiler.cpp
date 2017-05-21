@@ -78,9 +78,10 @@ namespace
 }
 
 GO_APIProfiler::GO_APIProfiler()
-	: myStart(0)
-	, myPreviousFrameStartTime(0)
+	: myPreviousFrameStartTime(0)
+	, myPreviousFrameEndTime(0)
 	, myCurrentFrameStartTime(0)
+	, myCurrentFrameEndTime(0)
 	, myProfilerOverhead(0)
 	, myCurrentNode(nullptr)
 	, myPreviousFrameRootNode(nullptr)
@@ -91,16 +92,15 @@ GO_APIProfiler::GO_APIProfiler()
 
 	// TODO: Why do we need this memory barrier? It is a legacy call from the original Jeff Phreshing implementation
 	MemoryBarrier();
-
-	LARGE_INTEGER start;
-	QueryPerformanceCounter(&start);
-	myStart = start.QuadPart;
 }
 
 void GO_APIProfiler::StoreFrameInHistory()
 {
 	myPreviousFrameStartTime = myCurrentFrameStartTime;
+	myPreviousFrameEndTime = myCurrentFrameEndTime;
+
 	myCurrentFrameStartTime = locGetCurrentProfilerTime();
+	myCurrentFrameEndTime = 0;
 
 	if (myPreviousFrameRootNode)
 	{
@@ -157,6 +157,8 @@ void GO_APIProfiler::EndFrame()
 
 	myCurrentNode->myAccumulator += (frameEndTime - myCurrentNode->myCurrentStartTime);
 	myCurrentNode->myHitCount++;
+
+	myCurrentFrameEndTime = frameEndTime;
 }
 
 void GO_APIProfiler::ReleaseNodeHierarchy(ProfilerNode* aProfilerNode)
@@ -183,6 +185,8 @@ ProfilerNode* GO_APIProfiler::GetNewNode()
 
 void GO_APIProfiler::BeginProfile(const char* aName, unsigned int aColor)
 {
+	GO_ASSERT(locGetCurrentProfilerTime() >= myCurrentFrameStartTime, "Recording a thread profile time before the frame has actually started");
+
 	long long startOverheadTime = locGetCurrentProfilerTime();
 
 	LARGE_INTEGER start;

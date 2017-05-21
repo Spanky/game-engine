@@ -72,6 +72,16 @@ public:
 		return myPreviousFrameStartTime;
 	}
 
+	long long GetPreviousFrameEndTime() const
+	{
+		return myPreviousFrameEndTime;
+	}
+
+	long long GetPreviousFrameDurationTicks() const
+	{
+		return myPreviousFrameEndTime - myPreviousFrameStartTime;
+	}
+
 	static float TicksToMilliseconds(long long aTickCount);
 
 private:
@@ -84,10 +94,11 @@ private:
 private:
 	static double ourFrequency;
 
-	long long myStart;
 	long long myPreviousFrameStartTime;
+	long long myPreviousFrameEndTime;
 
 	long long myCurrentFrameStartTime;
+	long long myCurrentFrameEndTime;
 
 	long long myProfilerOverhead;
 	ProfilerNode* myCurrentNode;
