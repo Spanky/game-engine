@@ -9,8 +9,10 @@ namespace GO
 	public:
 		SpriteComponent(Entity& anEntity);
 
+		void render(sf::RenderWindow& aRenderWindow);
+
 	private:
-		virtual void update() override;
+		virtual void update() override {};
 
 		sf::Sprite mySprite;
 	};

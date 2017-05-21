@@ -374,9 +374,7 @@ void UpdateComponents(SystemUpdateParams& someUpdateParams)
 	sf::RenderWindow& window = someUpdateParams.myRenderWindow;
 	GO::GameInstance& gameInstance = someUpdateParams.myGameInstance;
 
-	window.setActive(true);
 	gameInstance.getTaskScheduler().update();
-	window.setActive(false);
 }
 
 void CalculateEntityMovements(SystemUpdateParams& someUpdateParams)
@@ -692,9 +690,6 @@ void RunGame()
 		}
 
 
-		window.setActive(false);
-
-
 		GO::TaskSchedulerNew  scheduler(threadPool, unsigned int(TaskIdentifiers::MaxNumberTasks), &testProfiler);
 		SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool, window, gameInstance);
 
@@ -744,9 +739,23 @@ void RunGame()
 		}
 
 
-		// TODO(scarroll): This function is actually considerably expensive
-		window.setActive(true);
 
+		// Rendering
+		// TODO(scarroll): Move this into it's own thread so that it can be constantly running
+		//					and updating as fast as possible. It should not have data ties with
+		//					the current game state
+		{
+			GO::World::EntityList& entityList = world.getEntities();
+			for(size_t i = 0; i < entityList.size(); i++)
+			{
+				GO::Entity& currentEntity = *entityList[i];
+				GO::SpriteComponent* spriteComponent = currentEntity.getComponent<GO::SpriteComponent>();
+				if(spriteComponent)
+				{
+					spriteComponent->render(window);
+				}
+			}
+		}
 
 		
 

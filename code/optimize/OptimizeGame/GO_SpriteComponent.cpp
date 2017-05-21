@@ -17,13 +17,11 @@ namespace GO
 		mySprite.setScale(5.0f, 5.0f);
 	}
 
-	void SpriteComponent::update()
+	void SpriteComponent::render(sf::RenderWindow& aRenderWindow)
 	{
-		sf::RenderWindow& renderWindow = GameInstance::GetInstance()->getMainWindow();
-
 		sf::Vector2f spritePosition(getEntity().getPosition().x, getEntity().getPosition().y);
 		mySprite.setPosition(spritePosition);
 
-		renderWindow.draw(mySprite);
+		aRenderWindow.draw(mySprite);
 	}
 }
