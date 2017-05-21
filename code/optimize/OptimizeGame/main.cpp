@@ -50,7 +50,7 @@ void AddSystemForUpdate(T& aSystemToUpdate, GO::TaskSchedulerNew& aTaskScheduler
 	const unsigned char profilerTag = GO::ProfilerTypeTraits<T>::ourProfilerTag;
 
 	std::vector<unsigned int> taskDependencies;
-	GO::GameUpdateSystemTypeTraits<T>::ourTaskDependencies.GatherTaskDependencies(taskDependencies);
+	GO::GameUpdateSystemTypeTraits<T>::ourTaskDependencies::GatherTaskDependencies(taskDependencies);
 
 	GO::Task updateSystemTask(unsigned int(taskIdentifier), std::bind(RunGameUpdateSystem, &aSystemToUpdate, someUpdateParams), profilerTag);
 
@@ -450,7 +450,7 @@ namespace GO
 	struct GameUpdateSystemTypeTraits<CalculateCombatDamageSystem>
 	{
 		static constexpr TaskIdentifiers ourTaskIdentifier = TaskIdentifiers::CalculateCombat;
-		static GameUpdateSystemNoDependencies ourTaskDependencies;
+		typedef GameUpdateSystemNoDependencies ourTaskDependencies;
 	};
 
 	template<>

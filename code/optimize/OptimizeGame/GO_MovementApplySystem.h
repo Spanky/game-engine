@@ -24,7 +24,7 @@ namespace GO
 	struct GameUpdateSystemTypeTraits<MovementApplySystem>
 	{
 		static constexpr TaskIdentifiers ourTaskIdentifier = TaskIdentifiers::ApplyEntityMovement;
-		static GameUpdateSystemOneDependencies<unsigned int(TaskIdentifiers::ApplyEntitySpawns)> ourTaskDependencies;
+		typedef GameUpdateSystemOneDependencies<unsigned int(TaskIdentifiers::ApplyEntitySpawns)> ourTaskDependencies;
 	};
 
 	template<>

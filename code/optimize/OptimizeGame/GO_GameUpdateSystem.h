@@ -49,7 +49,7 @@ namespace GO
 
 	struct GameUpdateSystemNoDependencies
 	{
-		void GatherTaskDependencies(std::vector<unsigned int>& someOutDependencies)
+		static void GatherTaskDependencies(std::vector<unsigned int>& someOutDependencies)
 		{
 		}
 	};
@@ -57,7 +57,7 @@ namespace GO
 	template<unsigned int TaskDependency>
 	struct GameUpdateSystemOneDependencies
 	{
-		void GatherTaskDependencies(std::vector<unsigned int>& someOutDependencies)
+		static void GatherTaskDependencies(std::vector<unsigned int>& someOutDependencies)
 		{
 			someOutDependencies.push_back(TaskDependency);
 		}
