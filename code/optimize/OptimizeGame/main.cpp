@@ -66,7 +66,7 @@ void drawFpsCounter(sf::RenderWindow& aWindow, const sf::Font& aFont, sf::Time a
 	text.setColor(sf::Color::Red);
 
 	char buffer[Int64TextWidth];
-	_i64toa_s(aDeltaTime.asMilliseconds(), buffer, Int64TextWidth, 10);
+	_i64toa_s(aDeltaTime.asMicroseconds(), buffer, Int64TextWidth, 10);
 	//_gcvt_s(buffer, Int64TextWidth, elapsedTime, 20);
 
 	text.setString(buffer);
@@ -252,6 +252,76 @@ void TestFrameProcessor()
 }
 
 
+template<typename Iterator, typename Callback, typename Type = typename std::iterator_traits<Iterator>::value_type>
+void RunParallel(Iterator anIterBegin, Iterator anIterEnd, GO::World &aWorld, GO::ThreadPool &aThreadPool, GO_APIProfiler &aProfiler, const unsigned char aThreadTag, Callback aCallback)
+{
+	if (anIterBegin == anIterEnd)
+	{
+		return;
+	}
+
+	// TODO(scarroll): Get the number of tasks available from the thread pool
+	const unsigned int threadCount = std::thread::hardware_concurrency();
+
+	size_t numElements = anIterEnd - anIterBegin;
+
+	// We have at least one job for every thread. Otherwise we'll just do the processing ourselves
+	if (numElements >= threadCount)
+	{
+		const size_t NumJobsPerThread = (numElements + threadCount - 1) / threadCount;
+
+		std::atomic_size_t counter = 0;
+		{
+			std::vector<std::future<int>> futures(threadCount - 1);
+
+			// Run the parallel batches
+			for (size_t i = 0; i < threadCount - 1; ++i)
+			{
+				const size_t startIndex = i * NumJobsPerThread;
+				const size_t endIndex = (i + 1) * NumJobsPerThread;
+
+				std::future<int> result = aThreadPool.Submit([&counter, &aProfiler, startIndex, endIndex, anIterBegin, aThreadTag, aCallback]() -> int
+				{
+					// TODO: The thread tag should be automatically gathered from the same tag as the 'submit' event
+					aProfiler.PushThreadEvent(aThreadTag);
+					aCallback(anIterBegin.operator->(), startIndex, endIndex, aProfiler);
+
+					const size_t numProcessed = endIndex - startIndex;
+
+					// TODO(scarroll): Remove the counter for batch processing once the system is complete
+					return int(counter.fetch_add(numProcessed));
+				});
+
+				futures[i] = std::move(result);
+			}
+
+
+			// Run the local batch
+			{
+				const size_t startIndex = (threadCount - 1) * NumJobsPerThread;
+				const size_t numProcessed = numElements - startIndex;
+				aCallback(anIterBegin.operator->(), startIndex, numElements, aProfiler);
+				counter.fetch_add(numProcessed);
+			}
+
+			std::for_each(futures.begin(), futures.end(), [](std::future<int>& aFuture)
+			{
+				aFuture.get();
+			});
+		}
+
+
+		size_t resultCounter = counter.load();
+		GO_ASSERT(resultCounter == numElements, "Number of jobs processed was not the same as the number of jobs submitted");
+	}
+	else
+	{
+		// Run everything locally since it's a small batch anyways
+		aCallback(anIterBegin.operator->(), 0, numElements, aProfiler);
+	}
+}
+
+
 struct CombatDamageMessage
 {
 	GO::Entity* myDealerEntity;
@@ -288,14 +358,24 @@ float DistanceBetweenEntities(const GO::Entity* aLHS, const GO::Entity* aRHS)
 
 namespace GameEvents
 {
+	std::mutex ourDamageQueueMutex;
+
 	void QueueDamage(GO::Entity* aDealer, GO::Entity* aReceiver, const float aDamageDone)
 	{
+		std::lock_guard<std::mutex> lock(ourDamageQueueMutex);
+
 		CombatDamageMessage msg;
 		msg.myDealerEntity = aDealer;
 		msg.myReceiverEntity = aReceiver;
 		msg.myDamageDealt = aDamageDone;
 
 		ourCombatDamageMessages.push_back(msg);
+	}
+
+	void QueueDamage(const std::vector<CombatDamageMessage>& someDamageMessages)
+	{
+		std::lock_guard<std::mutex> lock(ourDamageQueueMutex);
+		ourCombatDamageMessages.insert(ourCombatDamageMessages.end(), someDamageMessages.begin(), someDamageMessages.end());
 	}
 
 	void QueueEntityForDeath(const GO::Entity* aDeadEntity, const GO::Entity* aKillerEntity)
@@ -325,34 +405,62 @@ void CalculateCombatDamage(SystemUpdateParams& someUpdateParams)
 {
 	GO::AssertMutexLock lock(ourCombatDamageMutex);
 	GO::World& world = someUpdateParams.myWorld;
-	const GO::World::EntityList& entityList = world.getEntities();
+	GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
+	GO_APIProfiler& profiler = someUpdateParams.myProfiler;
+
+	GO::World::EntityList& entityList = world.getEntities();
 	const size_t entityListSize = entityList.size();
 
-	for(size_t outerIndex = 0; outerIndex < entityListSize; outerIndex++)
+	RunParallel(entityList.begin(), entityList.end(), world, threadPool, profiler, GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK,
+		[&](GO::Entity** someEntities, const size_t aStartIndex, const size_t anEndIndex, GO_APIProfiler& aProfiler)
 	{
-		GO::Entity* outerEntity = entityList[outerIndex];
-		GO_ASSERT(outerEntity, "Entity list contains a nullptr");
+		const GO::World::EntityList& entityList = world.getEntities();
+		const size_t entityListSize = entityList.size();
 
-		for(size_t innerIndex = outerIndex + 1; innerIndex < entityListSize; innerIndex++)
+		std::vector<CombatDamageMessage> damageMessages;
+
+		for (size_t outerIndex = aStartIndex; outerIndex < anEndIndex; outerIndex++)
 		{
-			GO::Entity* innerEntity = entityList[innerIndex];
-			GO_ASSERT(innerEntity, "Entity list contains a nullptr");
+			GO::Entity* outerEntity = someEntities[outerIndex];
+			GO_ASSERT(outerEntity, "Entity list contains a nullptr");
 
-			const float distance = DistanceBetweenEntities(outerEntity, innerEntity);
-			if(distance < 100.0f)
+			for (size_t innerIndex = outerIndex + 1; innerIndex < entityListSize; innerIndex++)
 			{
-				GameEvents::QueueDamage(outerEntity, innerEntity, 1.0f);
-				GameEvents::QueueDamage(innerEntity, outerEntity, 1.0f);
+				GO::Entity* innerEntity = entityList[innerIndex];
+				GO_ASSERT(innerEntity, "Entity list contains a nullptr");
+
+				const float distance = DistanceBetweenEntities(outerEntity, innerEntity);
+				if (distance < 100.0f)
+				{
+					{
+						CombatDamageMessage msg;
+						msg.myDealerEntity = outerEntity;
+						msg.myReceiverEntity = innerEntity;
+						msg.myDamageDealt = 1.0f;
+						damageMessages.push_back(msg);
+					}
+
+					{
+						CombatDamageMessage msg;
+						msg.myDealerEntity = innerEntity;
+						msg.myReceiverEntity = outerEntity;
+						msg.myDamageDealt = 1.0f;
+						damageMessages.push_back(msg);
+					}
+				}
 			}
 		}
-	}
+
+		// TODO(scarroll): Perform the gather in parallel with other tasks
+		GameEvents::QueueDamage(damageMessages);
+	});
 }
 
-void ApplyCombatDamageInternal(const size_t aStartIndex, const size_t anEndIndex, GO_APIProfiler& aProfiler)
+void ApplyCombatDamageInternal(const CombatDamageMessage* someCombatMessages, const size_t aStartIndex, const size_t anEndIndex, GO_APIProfiler& aProfiler)
 {
 	for (size_t currentIndex = aStartIndex; currentIndex < anEndIndex; currentIndex++)
 	{
-		const CombatDamageMessage& damageMsg = ourCombatDamageMessages[currentIndex];
+		const CombatDamageMessage& damageMsg = (someCombatMessages[currentIndex]);
 
 		GO::Entity* dealerEntity = damageMsg.myDealerEntity;
 		GO::Entity* receiverEntity = damageMsg.myReceiverEntity;
@@ -377,64 +485,7 @@ void ApplyCombatDamage(const SystemUpdateParams& someUpdateParams)
 	GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
 	GO_APIProfiler& profiler = someUpdateParams.myProfiler;
 
-	// TODO(scarroll): Get the number of tasks available from the thread pool
-	const unsigned int threadCount = std::thread::hardware_concurrency();
-
-	// We have at least one job for every thread. Otherwise we'll just do the processing ourselves
-	if(ourCombatDamageMessages.size() >= threadCount)
-	{
-		const size_t NumJobsPerThread = (ourCombatDamageMessages.size() + threadCount - 1) / threadCount;
-
-		const GO::World::EntityList& entityList = world.getEntities();
-		const size_t entityListSize = entityList.size();
-
-		std::atomic_size_t counter = 0;
-		{
-			std::vector<std::future<int>> futures(threadCount - 1);
-
-			// Run the parallel batches
-			for (size_t i = 0; i < threadCount - 1; ++i)
-			{
-				const size_t startIndex = i * NumJobsPerThread;
-				const size_t endIndex = (i + 1) * NumJobsPerThread;
-
-				std::future<int> result = threadPool.Submit([&counter, &profiler, startIndex, endIndex]() -> int
-				{
-					// TODO: The thread tag should be automatically gathered from the same tag as the 'submit' event
-					profiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-					ApplyCombatDamageInternal(startIndex, endIndex, profiler);
-
-					const size_t numProcessed = endIndex - startIndex;
-					return counter.fetch_add(numProcessed);
-				});
-
-				futures[i] = std::move(result);
-			}
-
-
-			// Run the local batch
-			{
-				const size_t startIndex = (threadCount - 1) * NumJobsPerThread;
-				const size_t numProcessed = ourCombatDamageMessages.size() - startIndex;
-				ApplyCombatDamageInternal(startIndex, ourCombatDamageMessages.size(), profiler);
-				counter.fetch_add(numProcessed);
-			}
-
-			std::for_each(futures.begin(), futures.end(), [](std::future<int>& aFuture)
-			{
-				aFuture.get();
-			});
-		}
-
-
-		size_t resultCounter = counter.load();
-		GO_ASSERT(resultCounter == ourCombatDamageMessages.size(), "Number of jobs processed was not the same as the number of jobs submitted");
-	}
-	else
-	{
-		// Run everything locally since it's a small batch anyways
-		ApplyCombatDamageInternal(0, ourCombatDamageMessages.size(), profiler);
-	}
+	RunParallel(ourCombatDamageMessages.begin(), ourCombatDamageMessages.end(), world, threadPool, profiler, GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK, &ApplyCombatDamageInternal);
 
 	ourCombatDamageMessages.clear();
 }
@@ -666,6 +717,7 @@ void RunGame()
 				window.setActive(true);
 				gameInstance.getTaskScheduler().update();
 				window.setActive(false);
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_UNKNOWN);
 
 				return 1;
 			});
