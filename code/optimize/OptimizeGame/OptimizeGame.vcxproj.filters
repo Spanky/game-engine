@@ -242,5 +242,11 @@
     <ClInclude Include="GO_TaskSchedulerNew.h">
       <Filter>Threading\Task System</Filter>
     </ClInclude>
+    <ClInclude Include="GO_GameUpdateSystem.h">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_TaskIdentifiers.h">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

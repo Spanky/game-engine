@@ -14,7 +14,7 @@ namespace GO
 	{
 	}
 
-	void MovementCalculationSystem::GenerateCalculations()
+	void MovementCalculationSystem::updateSystem(SystemUpdateParams& someUpdateParams)
 	{
 		GeneratePlayerMovementBasedOnInput();
 		RandomlyMoveEnemies();

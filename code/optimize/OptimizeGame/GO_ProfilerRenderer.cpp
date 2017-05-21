@@ -98,6 +98,8 @@ namespace GO_ProfilerRenderer
 			// 0xRRGGBBAA
 		case GO_ProfilerTags::THREAD_TAG_UNKNOWN:
 			return sf::Color(0xffffffff);
+		case GO_ProfilerTags::THREAD_TAG_IDLE:
+			return sf::Color(0x777777ff);
 		case GO_ProfilerTags::THREAD_TAG_WAITING:
 			return sf::Color(0xff000099);
 		case GO_ProfilerTags::THREAD_TAG_OVERHEAD:
@@ -118,6 +120,8 @@ namespace GO_ProfilerRenderer
 			return sf::Color(0x33ee55ff);
 		case GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK:
 			return sf::Color(0x0000ffff);
+		case GO_ProfilerTags::THREAD_TAG_APPLY_SYNC_POINT_TASK:
+			return sf::Color(0xff7700ff);
 		default:
 			return sf::Color(0xffffffff);
 		}
@@ -131,6 +135,8 @@ namespace GO_ProfilerRenderer
 			// 0xRRGGBBAA
 		case GO_ProfilerTags::THREAD_TAG_UNKNOWN:
 			return "Unknown";
+		case GO_ProfilerTags::THREAD_TAG_IDLE:
+			return "Idle";
 		case GO_ProfilerTags::THREAD_TAG_WAITING:
 			return "Waiting";
 		case GO_ProfilerTags::THREAD_TAG_OVERHEAD:
@@ -149,8 +155,10 @@ namespace GO_ProfilerRenderer
 			return "Calc Game Task";
 		case GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK:
 			return "Apply Game Task";
+		case GO_ProfilerTags::THREAD_TAG_APPLY_SYNC_POINT_TASK:
+			return "Apply Game Sync Point";
 		default:
-			return "Unknown";
+			return "Un-named";
 		}
 	}
 

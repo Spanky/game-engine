@@ -1,16 +1,20 @@
 #pragma once
 
+#include "GO_GameUpdateSystem.h"
+#include "GO_TaskIdentifiers.h"
+#include "GO_ProfilerTags.h"
+
 
 namespace GO
 {
 	class World;
 
-	class MovementCalculationSystem
+	class MovementCalculationSystem : public GameUpdateSystem
 	{
 	public:
 		MovementCalculationSystem(World& aWorld);
 
-		void GenerateCalculations();
+		virtual void updateSystem(SystemUpdateParams& someUpdateParams) override;
 
 	private:
 		void GeneratePlayerMovementBasedOnInput();
@@ -18,5 +22,19 @@ namespace GO
 
 	private:
 		World& myWorld;
+	};
+
+
+	template<>
+	struct GameUpdateSystemTypeTraits<MovementCalculationSystem>
+	{
+		static constexpr TaskIdentifiers ourTaskIdentifier = TaskIdentifiers::CalculateMovement;
+		static GameUpdateSystemNoDependencies ourTaskDependencies;
+	};
+
+	template<>
+	struct ProfilerTypeTraits<MovementCalculationSystem>
+	{
+		static const unsigned char ourProfilerTag = GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK;
 	};
 }

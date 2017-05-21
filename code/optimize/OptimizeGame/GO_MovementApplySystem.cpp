@@ -29,8 +29,10 @@ namespace GO
 	{
 	}
 
-	void MovementApplySystem::ApplyPendingMovementChanges(sf::Time aDeltaTime)
+	void MovementApplySystem::updateSystem(SystemUpdateParams& someUpdateParams)
 	{
+		const sf::Time deltaTime = someUpdateParams.myDeltaTime;
+
 		// Process all of our messages before we update the actual movement
 		for (const GameStateChange::MovementMessage& movementMsg : GameStateChange::ourMovementMessages)
 		{
@@ -56,7 +58,7 @@ namespace GO
 			{
 				if (movementComponent->myHasMovementQueued)
 				{
-					movementComponent->myTileMovementCursor += (0.5f / aDeltaTime.asMilliseconds());
+					movementComponent->myTileMovementCursor += (0.5f / deltaTime.asMilliseconds());
 
 					sf::Vector2i lerpedPosition = LerpTiles(movementComponent->myCurrentTileIndex, movementComponent->myDestinationTileIndex, movementComponent->myTileMovementCursor);
 					currentEntity->setPosition(lerpedPosition);

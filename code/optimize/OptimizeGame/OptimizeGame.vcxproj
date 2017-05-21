@@ -207,6 +207,7 @@
     <ClInclude Include="GO_EntityComponent.h" />
     <ClInclude Include="GO_GameInstance.h" />
     <ClInclude Include="GO_GameStateChange.h" />
+    <ClInclude Include="GO_GameUpdateSystem.h" />
     <ClInclude Include="GO_Gameworks.h" />
     <ClInclude Include="GO_HacksGlobalResources.h" />
     <ClInclude Include="GO_HealthComponent.h" />
@@ -223,6 +224,7 @@
     <ClInclude Include="GO_RandomMovementComponent.h" />
     <ClInclude Include="GO_SpriteComponent.h" />
     <ClInclude Include="GO_StatusEffectComponent.h" />
+    <ClInclude Include="GO_TaskIdentifiers.h" />
     <ClInclude Include="GO_TaskScheduler.h" />
     <ClInclude Include="GO_TaskSchedulerNew.h" />
     <ClInclude Include="GO_Thread.h" />
