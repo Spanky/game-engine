@@ -1,10 +1,9 @@
 #include "StableHeaders.h"
 #include "GO_ComponentUpdater.h"
 
-#include "GO_EntityComponent.h"
-
 namespace GO
-{	void ComponentUpdater::registerComponent(EntityComponent* aComponent)
+{
+	void ComponentUpdater::registerComponent(EntityComponent* aComponent)
 	{
 		myComponents.push_back(aComponent);
 	}
@@ -15,13 +14,5 @@ namespace GO
 		GO_ASSERT(searchIter != myComponents.end(), "Component was not registered with the updater system");
 
 		myComponents.erase(searchIter);
-	}
-
-	void ComponentUpdater::updateComponents()
-	{
-		for (EntityComponent* currentComponent : myComponents)
-		{
-			currentComponent->updateComponent();
-		}
 	}
 }

@@ -177,7 +177,6 @@
     <ClCompile Include="GO_HacksGlobalResources.cpp" />
     <ClCompile Include="GO_MovementApplySystem.cpp" />
     <ClCompile Include="GO_MovementCalculationSystem.cpp" />
-    <ClCompile Include="GO_MovementComponent.cpp" />
     <ClCompile Include="GO_Profiler.cpp">
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AssemblyAndSourceCode</AssemblerOutput>
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AssemblyAndSourceCode</AssemblerOutput>
@@ -186,7 +185,6 @@
     <ClCompile Include="GO_PropagationCell.cpp" />
     <ClCompile Include="GO_PropagationMatrix.cpp" />
     <ClCompile Include="GO_PropagationRow.cpp" />
-    <ClCompile Include="GO_RandomMovementComponent.cpp" />
     <ClCompile Include="GO_SpriteComponent.cpp" />
     <ClCompile Include="GO_StatusEffectComponent.cpp" />
     <ClCompile Include="GO_TaskScheduler.cpp" />

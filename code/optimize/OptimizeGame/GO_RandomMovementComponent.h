@@ -7,9 +7,9 @@ namespace GO
 	class RandomMovementComponent : public EntityComponent
 	{
 	public:
-		RandomMovementComponent(Entity& anEntity);
-
-	private:
-		virtual void update() override;
+		RandomMovementComponent(Entity& anEntity)
+			: EntityComponent(anEntity)
+		{
+		}
 	};
 }

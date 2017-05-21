@@ -13,8 +13,5 @@ namespace GO
 		}
 
 		float myHealth;
-
-	private:
-		virtual void update() override {};
 	};
 }

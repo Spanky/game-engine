@@ -10,8 +10,6 @@ namespace GO
 		void registerComponent(EntityComponent* aComponent);
 		void unregisterComponent(EntityComponent* aComponent);
 
-		void updateComponents();
-
 	private:
 		std::vector<EntityComponent*> myComponents;
 	};

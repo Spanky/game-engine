@@ -3,11 +3,6 @@
 
 namespace GO
 {
-	void TaskScheduler::update()
-	{
-		myComponentUpdater.updateComponents();
-	}
-
 	void TaskScheduler::registerComponent(EntityComponent* aComponent)
 	{
 		myComponentUpdater.registerComponent(aComponent);

@@ -9,8 +9,6 @@ namespace GO
 	class TaskScheduler
 	{
 	public:
-		void update();
-
 		void registerComponent(EntityComponent* aComponent);
 		void unregisterComponent(EntityComponent* aComponent);
 

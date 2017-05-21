@@ -10,9 +10,6 @@ namespace GO
 		StatusEffectComponent();
 		StatusEffectComponent(Entity& anEntity);
 
-	private:
-		virtual void update() override;
-
 		void performUpdate();
 
 	private:

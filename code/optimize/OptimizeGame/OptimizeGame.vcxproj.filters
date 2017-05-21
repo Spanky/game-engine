@@ -105,9 +105,6 @@
     <ClCompile Include="GO_ComponentUpdater.cpp">
       <Filter>Scheduling</Filter>
     </ClCompile>
-    <ClCompile Include="GO_RandomMovementComponent.cpp">
-      <Filter>Entity Systems\Components</Filter>
-    </ClCompile>
     <ClCompile Include="GO_PropagationMatrix.cpp">
       <Filter>Gameplay\Systems\Propagation</Filter>
     </ClCompile>
@@ -131,9 +128,6 @@
     </ClCompile>
     <ClCompile Include="GO_ProfilerRenderer.cpp">
       <Filter>Profiling</Filter>
-    </ClCompile>
-    <ClCompile Include="GO_MovementComponent.cpp">
-      <Filter>Entity Systems\Components</Filter>
     </ClCompile>
     <ClCompile Include="GO_MovementCalculationSystem.cpp">
       <Filter>Entity Systems\Systems</Filter>

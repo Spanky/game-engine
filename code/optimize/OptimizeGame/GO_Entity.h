@@ -24,8 +24,6 @@ namespace GO
 
 		void destroyAllComponents();
 
-		void update();
-
 		const sf::Vector2i& getPosition() const { return myPosition; }
 		void setPosition(const sf::Vector2i& aPosition);
 

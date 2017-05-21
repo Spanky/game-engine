@@ -22,8 +22,5 @@ namespace GO
 
 		// TODO: How do we track things like having already queued up a movement request for this entity?
 		bool myHasMovementQueued;
-
-	private:
-		virtual void update() override;
 	};
 }

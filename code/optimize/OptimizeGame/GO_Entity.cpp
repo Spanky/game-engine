@@ -30,14 +30,6 @@ namespace GO
 		myComponents.clear();
 	}
 
-	void Entity::update()
-	{
-		for(EntityComponent* currentComponent : myComponents)
-		{
-			currentComponent->updateComponent();
-		}
-	}
-
 	void Entity::setPosition(const sf::Vector2i& aPosition)
 	{
 		myPosition = aPosition;

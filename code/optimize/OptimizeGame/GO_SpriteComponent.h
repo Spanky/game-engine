@@ -12,8 +12,6 @@ namespace GO
 		void render(sf::RenderWindow& aRenderWindow);
 
 	private:
-		virtual void update() override {};
-
 		sf::Sprite mySprite;
 	};
 }

@@ -369,14 +369,6 @@ namespace GameEvents
 	}
 }
 
-void UpdateComponents(SystemUpdateParams& someUpdateParams)
-{
-	sf::RenderWindow& window = someUpdateParams.myRenderWindow;
-	GO::GameInstance& gameInstance = someUpdateParams.myGameInstance;
-
-	gameInstance.getTaskScheduler().update();
-}
-
 void CalculateEntityMovements(SystemUpdateParams& someUpdateParams)
 {
 	GO::MovementCalculationSystem movementCalcSystem(someUpdateParams.myWorld);
@@ -524,7 +516,6 @@ void ApplyEntityMovement(const SystemUpdateParams& someUpdateParams)
 
 enum class TaskIdentifiers : unsigned int
 {
-	UpdateComponents,
 	CalculateCombat,
 	CalculateMovement,
 	CalculateFinished,
@@ -693,21 +684,13 @@ void RunGame()
 		GO::TaskSchedulerNew  scheduler(threadPool, unsigned int(TaskIdentifiers::MaxNumberTasks), &testProfiler);
 		SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool, window, gameInstance);
 
-		// Legacy: Component updating
-		{
-			PROFILER_SCOPED(&testProfiler, "Task Scheduler", 0xffff00ff);
-
-			GO::Task updateComponentTask(unsigned int(TaskIdentifiers::UpdateComponents), std::bind(UpdateComponents, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_TASK_SCHEDULER);
-			scheduler.addTask(updateComponentTask);
-		}
-
 		
 		// Game Calculation Steps
 		{
 			PROFILER_SCOPED(&testProfiler, "Calculate Game Step", 0xff0000ff);
 			
 			GO::Task calcDamageTask(unsigned int(TaskIdentifiers::CalculateCombat), std::bind(CalculateCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
-			scheduler.addTask(calcDamageTask, unsigned int(TaskIdentifiers::UpdateComponents));
+			scheduler.addTask(calcDamageTask);
 
 			GO::Task calcMovementsTask(unsigned int(TaskIdentifiers::CalculateMovement), std::bind(CalculateEntityMovements, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
 			scheduler.addTask(calcMovementsTask);

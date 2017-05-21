@@ -7,9 +7,4 @@ namespace GO
 		: myEntity(anEntity)
 	{
 	}
-
-	void EntityComponent::updateComponent()
-	{
-		update();
-	}
 }

@@ -19,11 +19,6 @@ namespace GO
 	{
 	}
 
-	void StatusEffectComponent::update()
-	{
-		performUpdate();
-	}
-
 	void StatusEffectComponent::performUpdate()
 	{
 		myNum++;
