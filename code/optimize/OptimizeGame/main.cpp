@@ -41,16 +41,22 @@ sf::Time deltaTime;
 
 struct SystemUpdateParams
 {
-	SystemUpdateParams(GO::World& aWorld, GO_APIProfiler& aProfiler, GO::ThreadPool& aThreadPool)
+	SystemUpdateParams(GO::World& aWorld, GO_APIProfiler& aProfiler, GO::ThreadPool& aThreadPool, sf::RenderWindow& aWindow, GO::GameInstance& aGameInstance)
 		: myWorld(aWorld)
 		, myProfiler(aProfiler)
 		, myThreadPool(aThreadPool)
+		, myRenderWindow(aWindow)
+		, myGameInstance(aGameInstance)
 	{
 	};
 
 	GO::World& myWorld;
 	GO_APIProfiler& myProfiler;
 	GO::ThreadPool& myThreadPool;
+
+	// TODO(scarroll): This should be phased out in case split screen is ever a requirement
+	sf::RenderWindow& myRenderWindow;
+	GO::GameInstance& myGameInstance;
 };
 
 GO::AssertMutex ourCombatDamageMutex;
@@ -166,38 +172,6 @@ void GO_FrameTaskProcessor::operator()()
 	}
 }
 
-
-void LaunchSampleGameThreads(GO::ThreadPool& aThreadPool, GO_APIProfiler& aProfiler)
-{
-	std::atomic_int counter = 0;
-	const int NumJobsSubmitted = 200;
-
-	{
-		std::vector<std::future<int>> futures(NumJobsSubmitted);
-
-		for (int i = 0; i < NumJobsSubmitted; ++i)
-		{
-			std::future<int> result = aThreadPool.Submit([&counter, &aProfiler]() -> int
-			{
-				// TODO: The thread tag should be automatically gathered from the same tag as the 'submit' event
-				aProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_GAME_TASK);
-				//std::this_thread::sleep_for(std::chrono::nanoseconds(10));
-				return counter.fetch_add(1);
-			});
-
-			futures[i] = std::move(result);
-		}
-
-		std::for_each(futures.begin(), futures.end(), [](std::future<int>& aFuture)
-		{
-			aFuture.get();
-		});
-	}
-
-
-	int resultCounter = counter.load();
-	GO_ASSERT(resultCounter == NumJobsSubmitted, "Number of jobs processed was not the same as the number of jobs submitted");
-}
 
 void TestFrameProcessor()
 {
@@ -395,6 +369,16 @@ namespace GameEvents
 	}
 }
 
+void UpdateComponents(SystemUpdateParams& someUpdateParams)
+{
+	sf::RenderWindow& window = someUpdateParams.myRenderWindow;
+	GO::GameInstance& gameInstance = someUpdateParams.myGameInstance;
+
+	window.setActive(true);
+	gameInstance.getTaskScheduler().update();
+	window.setActive(false);
+}
+
 void CalculateEntityMovements(SystemUpdateParams& someUpdateParams)
 {
 	GO::MovementCalculationSystem movementCalcSystem(someUpdateParams.myWorld);
@@ -542,6 +526,7 @@ void ApplyEntityMovement(const SystemUpdateParams& someUpdateParams)
 
 enum class TaskIdentifiers : unsigned int
 {
+	UpdateComponents,
 	CalculateCombat,
 	CalculateMovement,
 	CalculateFinished,
@@ -707,37 +692,27 @@ void RunGame()
 		}
 
 
-		{
-			PROFILER_SCOPED(&testProfiler, "Task Scheduler", 0xffff00ff);
-			window.setActive(false);
-
-			std::future<int> result = threadPool.Submit([&testProfiler, &gameInstance, &window]() -> int
-			{
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_TASK_SCHEDULER);
-				window.setActive(true);
-				gameInstance.getTaskScheduler().update();
-				window.setActive(false);
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_UNKNOWN);
-
-				return 1;
-			});
-
-			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
-			result.get();
-			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-
-			window.setActive(true);
-		}
+		window.setActive(false);
 
 
 		GO::TaskSchedulerNew  scheduler(threadPool, unsigned int(TaskIdentifiers::MaxNumberTasks), &testProfiler);
-		SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool);
+		SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool, window, gameInstance);
 
+		// Legacy: Component updating
+		{
+			PROFILER_SCOPED(&testProfiler, "Task Scheduler", 0xffff00ff);
+
+			GO::Task updateComponentTask(unsigned int(TaskIdentifiers::UpdateComponents), std::bind(UpdateComponents, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_TASK_SCHEDULER);
+			scheduler.addTask(updateComponentTask);
+		}
+
+		
+		// Game Calculation Steps
 		{
 			PROFILER_SCOPED(&testProfiler, "Calculate Game Step", 0xff0000ff);
 			
 			GO::Task calcDamageTask(unsigned int(TaskIdentifiers::CalculateCombat), std::bind(CalculateCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
-			scheduler.addTask(calcDamageTask);
+			scheduler.addTask(calcDamageTask, unsigned int(TaskIdentifiers::UpdateComponents));
 
 			GO::Task calcMovementsTask(unsigned int(TaskIdentifiers::CalculateMovement), std::bind(CalculateEntityMovements, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK);
 			scheduler.addTask(calcMovementsTask);
@@ -746,30 +721,31 @@ void RunGame()
 			scheduler.addTask(noopTask, unsigned int(TaskIdentifiers::CalculateCombat), unsigned int(TaskIdentifiers::CalculateMovement));
 		}
 
+		// Game Apply Steps
 		{
 			PROFILER_SCOPED(&testProfiler, "Apply Game Step", 0x00ff00ff);
 
-			{
-				SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool);
-				
-				GO::Task combatDamageTask(unsigned int(TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-				scheduler.addTask(combatDamageTask, unsigned int(TaskIdentifiers::CalculateFinished));
+			GO::Task combatDamageTask(unsigned int(TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+			scheduler.addTask(combatDamageTask, unsigned int(TaskIdentifiers::CalculateFinished));
 
-				GO::Task entityDeathTask(unsigned int(TaskIdentifiers::ApplyEntityDeaths), std::bind(&ApplyEntityDeaths, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-				scheduler.addTask(entityDeathTask, unsigned int(TaskIdentifiers::ApplyCombatDamage));
+			GO::Task entityDeathTask(unsigned int(TaskIdentifiers::ApplyEntityDeaths), std::bind(&ApplyEntityDeaths, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+			scheduler.addTask(entityDeathTask, unsigned int(TaskIdentifiers::ApplyCombatDamage));
 
-				GO::Task entitySpawnTask(unsigned int(TaskIdentifiers::ApplyEntitySpawns), std::bind(&ApplyEntitySpawns, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-				scheduler.addTask(entitySpawnTask, unsigned int(TaskIdentifiers::ApplyEntityDeaths));
+			GO::Task entitySpawnTask(unsigned int(TaskIdentifiers::ApplyEntitySpawns), std::bind(&ApplyEntitySpawns, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+			scheduler.addTask(entitySpawnTask, unsigned int(TaskIdentifiers::ApplyEntityDeaths));
 
-				GO::Task entityMovementTask(unsigned int(TaskIdentifiers::ApplyEntityMovement), std::bind(&ApplyEntityMovement, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-				scheduler.addTask(entityMovementTask, unsigned int(TaskIdentifiers::ApplyEntitySpawns));
+			GO::Task entityMovementTask(unsigned int(TaskIdentifiers::ApplyEntityMovement), std::bind(&ApplyEntityMovement, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+			scheduler.addTask(entityMovementTask, unsigned int(TaskIdentifiers::ApplyEntitySpawns));
 
-				scheduler.runPendingTasks();
+			scheduler.runPendingTasks();
 
-				// TODO(scarroll): This is required because runPendingTasks does not store/reset when it changes the tag
-				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-			}
+			// TODO(scarroll): This is required because runPendingTasks does not store/reset when it changes the tag
+			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
 		}
+
+
+		// TODO(scarroll): This function is actually considerably expensive
+		window.setActive(true);
 
 
 		
@@ -799,15 +775,6 @@ void RunGame()
 
 		drawFpsCounter(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), deltaTime);
 		//drawThreadId(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont());
-
-
-		{
-			PROFILER_SCOPED(&testProfiler, "Sample Tasks", 0xff0000ff);
-			// TODO: This is not strictly wait time. It's ignoring the time it takes to queue up the jobs
-			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
-			LaunchSampleGameThreads(threadPool, testProfiler);
-			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-		}
 
 
 		{
