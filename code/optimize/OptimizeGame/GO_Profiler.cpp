@@ -6,25 +6,41 @@
 // TODO: Move this to a common 'standards' file
 static const int CacheLineSizeInBytes = 64;
 
-static_assert(sizeof(ProfilerNode) <= CacheLineSizeInBytes, "ProfilerNode needs to fit in a single cache line");
-static_assert((CacheLineSizeInBytes % sizeof(ProfilerNode)) == 0, "ProfilerNode needs to fit evenly in a cache line");
+static_assert(sizeof(CallGraphNode) <= CacheLineSizeInBytes, "CallGraphNode needs to fit in a single cache line");
+static_assert((CacheLineSizeInBytes % sizeof(CallGraphNode)) == 0, "CallGraphNode needs to fit evenly in a cache line");
 
 double GO_APIProfiler::ourFrequency = 0;
 
-thread_local unsigned char locMyThreadIndex = UCHAR_MAX;
+thread_local unsigned char locMyThreadIndex = MaxThreadCount;
 
 static std::atomic_uchar locTotalThreadCount = 0;
 static std::mutex locEventListMutex;
 
 
+
+
+struct CallGraphHistory
+{
+	std::array<GO_APIProfiler::FrameCallGraphRoots, 30> myFrameHistory;
+};
+
+int locCurrentFrameIndex = 0;
+int locViewFrameIndex = -1;
+CallGraphHistory locCallGraphHistory;
+
+GO_APIProfiler::FrameCallGraphRoots locFramePausedTempStorage = {};
+
+GO_APIProfiler::FrameCallGraphRoots locThreadCallGraphNodeCurrents = {};
+
+
 unsigned char GetCurrentThreadIndex()
 {
-	if (locMyThreadIndex == UCHAR_MAX)
+	if (locMyThreadIndex == MaxThreadCount)
 	{
 		// TODO: The mod here is only to support our usage of std::thread since we spin up new threads
 		//		 for every thread pool right now
 		locMyThreadIndex = (locTotalThreadCount++);
-		GO_ASSERT(locMyThreadIndex < UCHAR_MAX, "Number of threads created exceeds hard-coded limits");
+		GO_ASSERT(locMyThreadIndex < MaxThreadCount, "Number of threads created exceeds hard-coded limits");
 	}
 
 	return locMyThreadIndex;
@@ -39,41 +55,30 @@ namespace
 		return currentTime.QuadPart;
 	}
 
-	void ResetNode(ProfilerNode& aNode)
+	void ResetNode(CallGraphNode& aNode)
 	{
-		aNode.myFirstChild = nullptr;
 		aNode.myName = nullptr;
-		aNode.mySibling = nullptr;
+		aNode.myStartTime = 0;
+		aNode.myEndTime = 0;
+		aNode.myColor = 0;
+
+		aNode.myLastChild = nullptr;
+		aNode.myPrevSibling = nullptr;
 		aNode.myParent = nullptr;
-		aNode.myCurrentStartTime = 0;
-		aNode.myAccumulator = 0;
-		aNode.myHitCount = 0;
 	}
 
-	void ResetToRootNode(ProfilerNode& aNode)
+	void ResetToRootNode(CallGraphNode& aNode)
 	{
 		ResetNode(aNode);
 		aNode.myName = "Root";
 	}
 
-	ProfilerNode* FindChildNode(ProfilerNode* aNode, const char* aChildName)
+	CallGraphNode* GetNewCallGraphNode()
 	{
-		ProfilerNode* childNode = aNode->myFirstChild;
-		while(childNode)
-		{
-			if(childNode->myName == aChildName)
-			{
-				return childNode;
-			}
-			else if (ProfilerNode* foundNode = FindChildNode(childNode, aChildName))
-			{
-				return foundNode;
-			}
+		CallGraphNode* callGraphNode = new CallGraphNode();
+		ResetNode(*callGraphNode);
 
-			childNode = childNode->mySibling;
-		}
-
-		return nullptr;
+		return callGraphNode;
 	}
 }
 
@@ -83,12 +88,24 @@ GO_APIProfiler::GO_APIProfiler()
 	, myCurrentFrameStartTime(0)
 	, myCurrentFrameEndTime(0)
 	, myProfilerOverhead(0)
-	, myCurrentNode(nullptr)
-	, myPreviousFrameRootNode(nullptr)
+	, myIsCollectionActive(true)
 {
 	LARGE_INTEGER freq;
 	QueryPerformanceFrequency(&freq);
 	ourFrequency = 1.0 / freq.QuadPart;
+
+	for (int i = 0; i < locCallGraphHistory.myFrameHistory.size(); i++)
+	{
+		for(int j = 0; j < locCallGraphHistory.myFrameHistory[i].size(); j++)
+		{
+			locCallGraphHistory.myFrameHistory[i][j] = nullptr;
+		}
+	}
+
+	for(int i = 0; i < MaxThreadCount; i++)
+	{
+		locThreadCallGraphNodeCurrents[i] = nullptr;
+	}
 
 	// TODO: Why do we need this memory barrier? It is a legacy call from the original Jeff Phreshing implementation
 	MemoryBarrier();
@@ -102,11 +119,37 @@ void GO_APIProfiler::StoreFrameInHistory()
 	myCurrentFrameStartTime = locGetCurrentProfilerTime();
 	myCurrentFrameEndTime = 0;
 
-	if (myPreviousFrameRootNode)
+
+	if(myIsCollectionActive)
 	{
-		ReleaseNodeHierarchy(myPreviousFrameRootNode);
+		locCurrentFrameIndex = (locCurrentFrameIndex + 1) % locCallGraphHistory.myFrameHistory.size();
+		if (locViewFrameIndex != -1)
+		{
+			locViewFrameIndex = (locViewFrameIndex + 1) % locCallGraphHistory.myFrameHistory.size();
+		}
+
+		// Release the frame that is about to be overwritten with this frames profiling data
+		for (int threadIndex = 0; threadIndex < MaxThreadCount; threadIndex++)
+		{
+			if (locCallGraphHistory.myFrameHistory[locCurrentFrameIndex][threadIndex])
+			{
+				ReleaseNodeHierarchy(locCallGraphHistory.myFrameHistory[locCurrentFrameIndex][threadIndex]);
+				locCallGraphHistory.myFrameHistory[locCurrentFrameIndex][threadIndex] = nullptr;
+			}
+		}
 	}
-	myPreviousFrameRootNode = myCurrentNode;
+	else
+	{
+		// Release the frame that is about to be overwritten with this frames profiling data
+		for (int threadIndex = 0; threadIndex < MaxThreadCount; threadIndex++)
+		{
+			if (locFramePausedTempStorage[threadIndex])
+			{
+				ReleaseNodeHierarchy(locFramePausedTempStorage[threadIndex]);
+				locFramePausedTempStorage[threadIndex] = nullptr;
+			}
+		}
+	}
 
 	{
 		std::lock_guard<std::mutex> eventLock(locEventListMutex);
@@ -115,23 +158,68 @@ void GO_APIProfiler::StoreFrameInHistory()
 	}
 }
 
+const GO_APIProfiler::FrameCallGraphRoots& GO_APIProfiler::GetPreviousFrameCallGraphRoots() const
+{
+	// The current 'view' index is set to 'active' which means that the most recent frame should be
+	// returned
+	int prevFrame = 0;
+
+	if(locViewFrameIndex == -1 || locViewFrameIndex == locCurrentFrameIndex)
+	{
+		prevFrame = (locCurrentFrameIndex - 1) % locCallGraphHistory.myFrameHistory.size();
+	}
+	else
+	{
+		prevFrame = locViewFrameIndex;
+	}
+	
+	GO_ASSERT(prevFrame >= 0 && prevFrame < locCallGraphHistory.myFrameHistory.size(), "Previous frame index was incorrectly calculated");
+	return locCallGraphHistory.myFrameHistory[prevFrame];
+}
+
 
 void GO_APIProfiler::BeginFrame()
 {
+	GO::AssertMutexLock lock(myProfilerEventMutex);
 	StoreFrameInHistory();
 
-	myCurrentNode = GetNewNode();
-	ResetToRootNode(*myCurrentNode);
-
-	myCurrentNode->myCurrentStartTime = locGetCurrentProfilerTime();
 	myProfilerOverhead = 0;
 
-	myCurrentFrameStartTime = myCurrentNode->myCurrentStartTime;
+	const long long currentTime = locGetCurrentProfilerTime();
+	myCurrentFrameStartTime = currentTime;
+
+	if(myIsCollectionActive)
+	{
+		for (int i = 0; i < MaxThreadCount; i++)
+		{
+			CallGraphNode* threadRoot = GetNewCallGraphNode();
+			ResetToRootNode(*threadRoot);
+
+			threadRoot->myStartTime = currentTime;
+
+			locThreadCallGraphNodeCurrents[i] = threadRoot;
+			locCallGraphHistory.myFrameHistory[locCurrentFrameIndex][i] = threadRoot;
+		}
+	}
+	else
+	{
+		for (int i = 0; i < MaxThreadCount; i++)
+		{
+			CallGraphNode* threadRoot = GetNewCallGraphNode();
+			ResetToRootNode(*threadRoot);
+
+			threadRoot->myStartTime = currentTime;
+
+			locThreadCallGraphNodeCurrents[i] = threadRoot;
+			locFramePausedTempStorage[i] = threadRoot;
+		}
+	}
 }
 
 void GO_APIProfiler::EndFrame()
 {
-	assert(myCurrentNode->myParent == nullptr && "Profile begin/end pairs mismatched. Root node expected to be the current node");
+	GO::AssertMutexLock lock(myProfilerEventMutex);
+
 	// TODO: Calling locGetCurrentProfilerTime() an additional jmp and mov instruction
 	//		 unrelated to the function call (it is inlined) compared to using:
 	//		 LARGE_INTEGER currentTime;
@@ -155,59 +243,57 @@ void GO_APIProfiler::EndFrame()
 	
 	long long frameEndTime = locGetCurrentProfilerTime();
 
-	myCurrentNode->myAccumulator += (frameEndTime - myCurrentNode->myCurrentStartTime);
-	myCurrentNode->myHitCount++;
-
 	myCurrentFrameEndTime = frameEndTime;
+
+	for (int i = 0; i < MaxThreadCount; i++)
+	{
+		locThreadCallGraphNodeCurrents[i]->myEndTime = frameEndTime;
+		GO_ASSERT(locThreadCallGraphNodeCurrents[i]->myParent == nullptr, "Some nodes were not popped correctly")
+	}
 }
 
-void GO_APIProfiler::ReleaseNodeHierarchy(ProfilerNode* aProfilerNode)
+void GO_APIProfiler::ReleaseNodeHierarchy(CallGraphNode* aCallGraphNode)
 {
-	ProfilerNode* childNode = aProfilerNode->myFirstChild;
+	CallGraphNode* childNode = aCallGraphNode->myLastChild;
 	while (childNode)
 	{
-		ProfilerNode* nextChild = childNode->mySibling;
+		CallGraphNode* nextChild = childNode->myPrevSibling;
 		ReleaseNodeHierarchy(childNode);
 
 		childNode = nextChild;
 	}
 
-	delete aProfilerNode;
-}
-
-ProfilerNode* GO_APIProfiler::GetNewNode()
-{
-	ProfilerNode* profilerNode = new ProfilerNode();
-	ResetNode(*profilerNode);
-
-	return profilerNode;
+	delete aCallGraphNode;
 }
 
 void GO_APIProfiler::BeginProfile(const char* aName, unsigned int aColor)
 {
+	//GO::AssertMutexLock lock(myProfilerEventMutex);
 	GO_ASSERT(locGetCurrentProfilerTime() >= myCurrentFrameStartTime, "Recording a thread profile time before the frame has actually started");
 
 	long long startOverheadTime = locGetCurrentProfilerTime();
 
 	LARGE_INTEGER start;
 	QueryPerformanceCounter(&start);
+	const long long currentTime = start.QuadPart;
 
-	// Find an existing node from the current node for this new profiler block
-	ProfilerNode* childNode = FindChildNode(myCurrentNode, aName);
-	if(childNode == nullptr)
-	{
-		childNode = GetNewNode();
-		childNode->myParent = myCurrentNode;
 
-		childNode->mySibling = myCurrentNode->myFirstChild;
-		myCurrentNode->myFirstChild = childNode;
+	unsigned char currentThreadIndex = GetCurrentThreadIndex();
 
-		childNode->myName = aName;
-		childNode->myColor = aColor;
-	}
+	// We need a new root node for this thread
+	CallGraphNode* parentNode = locThreadCallGraphNodeCurrents[currentThreadIndex];
 
-	myCurrentNode = childNode;
-	myCurrentNode->myCurrentStartTime = start.QuadPart;
+	CallGraphNode* newCallNode = GetNewCallGraphNode();
+	newCallNode->myPrevSibling = parentNode->myLastChild;
+	newCallNode->myName = aName;
+	newCallNode->myColor = aColor;
+	newCallNode->myStartTime = currentTime;
+	newCallNode->myParent = parentNode;
+
+	parentNode->myLastChild = newCallNode;
+
+	locThreadCallGraphNodeCurrents[currentThreadIndex] = newCallNode;
+
 
 	QueryPerformanceCounter(&start);
 	myProfilerOverhead += (start.QuadPart - startOverheadTime);
@@ -215,19 +301,24 @@ void GO_APIProfiler::BeginProfile(const char* aName, unsigned int aColor)
 
 void GO_APIProfiler::EndProfile(const char* aName)
 {
+	//GO::AssertMutexLock lock(myProfilerEventMutex);
+
 	LARGE_INTEGER start;
 	QueryPerformanceCounter(&start);
 	long long profileEndTime = start.QuadPart;
 
-	assert(myCurrentNode->myName == aName);
-	assert(myCurrentNode->myParent != nullptr);
 
-	myCurrentNode->myHitCount++;
+	unsigned char currentThreadIndex = GetCurrentThreadIndex();
 
-	myCurrentNode->myAccumulator += (profileEndTime - myCurrentNode->myCurrentStartTime);
-	//myCurrentNode->myCurrentStartTime = 0;
+	// We need a new root node for this thread
+	CallGraphNode* currentNode = locThreadCallGraphNodeCurrents[currentThreadIndex];
+	GO_ASSERT(currentNode->myParent != nullptr, "Attempting to remove a call graph node that has no parent");
+	currentNode->myEndTime = profileEndTime;
 
-	myCurrentNode = myCurrentNode->myParent;
+	GO_ASSERT(currentNode->myName == aName, "EndProfile called on a mismatched tag");
+
+	locThreadCallGraphNodeCurrents[currentThreadIndex] = currentNode->myParent;
+
 
 	QueryPerformanceCounter(&start);
 	myProfilerOverhead += (start.QuadPart - profileEndTime);
@@ -251,6 +342,26 @@ void GO_APIProfiler::PushThreadEvent(unsigned char aThreadTag)
 float GO_APIProfiler::TicksToMilliseconds(long long aTickCount)
 {
 	return aTickCount * ourFrequency * 1000;
+}
+
+void GO_APIProfiler::PauseCollection()
+{
+	myIsCollectionActive = false;
+}
+
+void GO_APIProfiler::ResumeCollection()
+{
+	myIsCollectionActive = true;
+}
+
+void GO_APIProfiler::ViewPrevFrame()
+{
+	locViewFrameIndex = (locViewFrameIndex - 1) % locCallGraphHistory.myFrameHistory.size();
+}
+
+void GO_APIProfiler::ViewNextFrame()
+{
+	locViewFrameIndex = (locViewFrameIndex + 1) % locCallGraphHistory.myFrameHistory.size();
 }
 
 #endif

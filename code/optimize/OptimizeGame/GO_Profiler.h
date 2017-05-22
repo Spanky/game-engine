@@ -1,32 +1,34 @@
 #pragma once
 
+#include "GO_AssertMutex.h"
+
 #define PROFILER_ENABLED 1
 
 #if PROFILER_ENABLED
 
 unsigned char GetCurrentThreadIndex();
 
-struct ProfilerNode
+static constexpr unsigned char MaxThreadCount = UCHAR_MAX;
+
+struct CallGraphNode
 {
 	// 0
 	const char* myName;
 
 	// 8
-	ProfilerNode* myFirstChild;
-	ProfilerNode* mySibling;
-	ProfilerNode* myParent;
+	long long myStartTime;
+	long long myEndTime;
 
-	// 32
-	long long myAccumulator;
-	long long myHitCount;
-
-	// 48
-	long long myCurrentStartTime;
+	//24
 	unsigned int myColor;
 
-	// 60
-	unsigned int myPadding;
-	
+	// 32
+	CallGraphNode* myLastChild;
+	CallGraphNode* myPrevSibling;
+	CallGraphNode* myParent;
+
+	unsigned char myPadding[8];
+
 	// 64
 };
 
@@ -44,6 +46,8 @@ struct ProfilerThreadEvent
 class GO_APIProfiler
 {
 public:
+	using FrameCallGraphRoots = std::array < CallGraphNode*, MaxThreadCount >;
+
 	GO_APIProfiler();
 	GO_APIProfiler(const GO_APIProfiler& aRHS) = delete;
 	GO_APIProfiler& operator=(const GO_APIProfiler& aRHS) = delete;
@@ -51,16 +55,17 @@ public:
 	void BeginFrame();
 	void EndFrame();
 
+	void PauseCollection();
+	void ResumeCollection();
+
+	// TODO(scarroll): These are view related and do not belong on the actual profiler
+	void ViewPrevFrame();
+	void ViewNextFrame();
+
 	void BeginProfile(const char* aName, unsigned int aColor);
 	void EndProfile(const char* aName);
 
 	void PushThreadEvent(unsigned char aThreadTag);
-
-	// TODO: These methods should not expose internals as to how they are implemented
-	ProfilerNode* GetPreviousFrameRootNode()
-	{
-		return myPreviousFrameRootNode;
-	}
 
 	const std::vector<ProfilerThreadEvent>& GetPreviousFrameThreadEvents()
 	{
@@ -84,11 +89,15 @@ public:
 
 	static float TicksToMilliseconds(long long aTickCount);
 
+	// TODO: These methods should not expose internals as to how they are implemented
+	const FrameCallGraphRoots& GetPreviousFrameCallGraphRoots() const;
+
 private:
-	ProfilerNode* GetNewNode();
-	void ReleaseNodeHierarchy(ProfilerNode* aProfilerNode);
+	void ReleaseNodeHierarchy(CallGraphNode* aCallGraphNode);
 
 	void StoreFrameInHistory();
+
+	GO::AssertMutex myProfilerEventMutex;
 
 
 private:
@@ -101,11 +110,11 @@ private:
 	long long myCurrentFrameEndTime;
 
 	long long myProfilerOverhead;
-	ProfilerNode* myCurrentNode;
-	ProfilerNode* myPreviousFrameRootNode;
 
 	std::vector<ProfilerThreadEvent> myThreadEvents;
 	std::vector<ProfilerThreadEvent> myPreviousThreadEvents;
+
+	bool myIsCollectionActive;
 };
 
 

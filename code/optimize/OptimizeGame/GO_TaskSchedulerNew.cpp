@@ -70,7 +70,7 @@ namespace GO
 	int TaskSchedulerNew::runTaskInternal(Task* aTask)
 	{
 		myProfiler->PushThreadEvent(aTask->getTaskTag());
-		(*aTask)();
+		(*aTask)(*myProfiler);
 
 		notifyTaskComplete(*aTask);
 		return 1;

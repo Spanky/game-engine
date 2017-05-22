@@ -5,6 +5,7 @@
 #include "GO_World.h"
 #include "GO_Entity.h"
 #include "GO_MovementComponent.h"
+#include "GO_Profiler.h"
 
 namespace
 {
@@ -31,6 +32,9 @@ namespace GO
 
 	void MovementApplySystem::updateSystem(SystemUpdateParams& someUpdateParams)
 	{
+		GO_APIProfiler& profiler = someUpdateParams.myProfiler;
+		PROFILER_SCOPED(&profiler, "MovementApplySystem", 0xff00ffff);
+
 		const sf::Time deltaTime = someUpdateParams.myDeltaTime;
 
 		// Process all of our messages before we update the actual movement

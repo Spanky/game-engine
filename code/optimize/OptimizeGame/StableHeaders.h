@@ -28,6 +28,7 @@
 #include <iterator>
 #include <vector>
 #include <queue>
+#include <array>
 
 #include <random>
 #include <functional>

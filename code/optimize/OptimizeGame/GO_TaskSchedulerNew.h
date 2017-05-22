@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GO_AssertMutex.h"
+#include "GO_Profiler.h"
 
 class GO_APIProfiler;
 
@@ -70,8 +71,9 @@ namespace GO
 			myHasStarted = true;
 		}
 
-		void operator()()
+		void operator()(GO_APIProfiler& aProfiler)
 		{
+			PROFILER_SCOPED(&aProfiler, "Task", 0xff8800ff);
 			myTask();
 
 			// TODO(scarroll): How do I make sure that this happens after myTask finishes?

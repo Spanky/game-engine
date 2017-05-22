@@ -271,6 +271,7 @@ void RunParallel(Iterator anIterBegin, Iterator anIterEnd, GO::World &aWorld, GO
 
 				std::future<int> result = aThreadPool.Submit([&counter, &aProfiler, startIndex, endIndex, anIterBegin, aThreadTag, aCallback]() -> int
 				{
+					PROFILER_SCOPED(&aProfiler, "Run Parallel", 0x00A2E8FF);
 					// TODO: The thread tag should be automatically gathered from the same tag as the 'submit' event
 					aProfiler.PushThreadEvent(aThreadTag);
 					aCallback(anIterBegin.operator->(), startIndex, endIndex, aProfiler);
@@ -396,12 +397,15 @@ namespace GO
 			GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
 			GO_APIProfiler& profiler = someUpdateParams.myProfiler;
 
+			PROFILER_SCOPED(&profiler, "CalculateCombatDamageSystem", 0xff5500ff);
+
 			GO::World::EntityList& entityList = world.getEntities();
 			const size_t entityListSize = entityList.size();
 
 			RunParallel(entityList.begin(), entityList.end(), world, threadPool, profiler, GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK,
 				[&](GO::Entity** someEntities, const size_t aStartIndex, const size_t anEndIndex, GO_APIProfiler& aProfiler)
 			{
+				PROFILER_SCOPED(&profiler, "CalculateCombatDamageSystem_Threaded", 0x992200ff);
 				const GO::World::EntityList& entityList = world.getEntities();
 				const size_t entityListSize = entityList.size();
 
@@ -409,6 +413,7 @@ namespace GO
 
 				for (size_t outerIndex = aStartIndex; outerIndex < anEndIndex; outerIndex++)
 				{
+					PROFILER_SCOPED(&profiler, "Testing Each Entity", 0xff5500ff);
 					GO::Entity* outerEntity = someEntities[outerIndex];
 					GO_ASSERT(outerEntity, "Entity list contains a nullptr");
 
@@ -463,6 +468,7 @@ namespace GO
 
 void ApplyCombatDamageInternal(const CombatDamageMessage* someCombatMessages, const size_t aStartIndex, const size_t anEndIndex, GO_APIProfiler& aProfiler)
 {
+	PROFILER_SCOPED(&aProfiler, "ApplyCombatDamageInternal", 0x6B0BBFFF);
 	for (size_t currentIndex = aStartIndex; currentIndex < anEndIndex; currentIndex++)
 	{
 		const CombatDamageMessage& damageMsg = (someCombatMessages[currentIndex]);
@@ -485,6 +491,7 @@ void ApplyCombatDamageInternal(const CombatDamageMessage* someCombatMessages, co
 
 void ApplyCombatDamage(const GO::SystemUpdateParams& someUpdateParams)
 {
+	PROFILER_SCOPED(&someUpdateParams.myProfiler, "ApplyCombatDamage", 0x8931D6FF);
 	GO::AssertMutexLock lock(ourCombatDamageMutex);
 	GO::World& world = someUpdateParams.myWorld;
 	GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
@@ -497,6 +504,7 @@ void ApplyCombatDamage(const GO::SystemUpdateParams& someUpdateParams)
 
 void ApplyEntityDeaths(const GO::SystemUpdateParams& someUpdateParams)
 {
+	PROFILER_SCOPED(&someUpdateParams.myProfiler, "ApplyEntityDeaths", 0xFFFFFFFF);
 	GO::World& world = someUpdateParams.myWorld;
 	const GO::World::EntityList& entityList = world.getEntities();
 
@@ -556,7 +564,7 @@ void RunGame()
 	ourGameworks.myDataDirectory = "..\\..\\..\\data\\";
 	sf::err().rdbuf(ourGameworks.mySFMLOutput.rdbuf());
 
-	sf::RenderWindow window(sf::VideoMode(1280, 720), "SFML works!", sf::Style::Close | sf::Style::Titlebar);
+	sf::RenderWindow window(sf::VideoMode(1600, 900), "SFML works!", sf::Style::Close | sf::Style::Titlebar);
 	//window.setVerticalSyncEnabled(true);
 
 
@@ -680,160 +688,160 @@ void RunGame()
 	{
 		PROFILER_BEGIN_FRAME(testProfiler);
 
-		testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-		
-		deltaTime = frameTimer.restart();
-
-		double elapsedTime = static_cast<double>(deltaTime.asMicroseconds()) / 1000.0;
-
 		{
-			PROFILER_SCOPED(&testProfiler, "Windows Loop", 0x0000ffff);
-			sf::Event event;
-			while (window.pollEvent(event))
-			{
-				if (event.type == sf::Event::Closed)
-				{
-					window.close();
-				}
-			}
-		}
+			PROFILER_SCOPED(&testProfiler, "Main Loop", 0xffffffff);
 
-
-		GO::TaskSchedulerNew  scheduler(threadPool, unsigned int(GO::TaskIdentifiers::MaxNumberTasks), &testProfiler);
-		GO::SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool, window, gameInstance, deltaTime);
-
-		
-		// Game Calculation Steps
-		{
-			PROFILER_SCOPED(&testProfiler, "Calculate Game Step", 0xff0000ff);
-			AddSystemForUpdate(calcCombatDamageSystem, scheduler, systemUpdateParams);
-			AddSystemForUpdate(calcEntityMovementSystem, scheduler, systemUpdateParams);
-
-			// TODO(scarroll): Make the dependency on the system (and it's type traits) rather than on the identifier within it
-			GO::Task noopTask(unsigned int(GO::TaskIdentifiers::CalculateFinished), std::bind(Noop), GO_ProfilerTags::THREAD_TAG_CALC_SYNC_POINT_TASK);
-			scheduler.addTask(noopTask, unsigned int(GO::TaskIdentifiers::CalculateCombat), unsigned int(GO::TaskIdentifiers::CalculateMovement));
-		}
-
-		// Game Apply Steps
-		{
-			PROFILER_SCOPED(&testProfiler, "Apply Game Step", 0x00ff00ff);
-
-			GO::Task combatDamageTask(unsigned int(GO::TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-			scheduler.addTask(combatDamageTask, unsigned int(GO::TaskIdentifiers::CalculateFinished));
-
-			GO::Task entityDeathTask(unsigned int(GO::TaskIdentifiers::ApplyEntityDeaths), std::bind(&ApplyEntityDeaths, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-			scheduler.addTask(entityDeathTask, unsigned int(GO::TaskIdentifiers::ApplyCombatDamage));
-
-			GO::Task entitySpawnTask(unsigned int(GO::TaskIdentifiers::ApplyEntitySpawns), std::bind(&ApplyEntitySpawns, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-			scheduler.addTask(entitySpawnTask, unsigned int(GO::TaskIdentifiers::ApplyEntityDeaths));
-
-			AddSystemForUpdate(movementSystem, scheduler, systemUpdateParams);
-		}
-
-
-		{
-			scheduler.runPendingTasks();
-
-			// TODO(scarroll): This is required because runPendingTasks does not store/reset when it changes the tag
 			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-		}
 
+			deltaTime = frameTimer.restart();
 
-
-		// Rendering
-		// TODO(scarroll): Move this into it's own thread so that it can be constantly running
-		//					and updating as fast as possible. It should not have data ties with
-		//					the current game state
-		{
-			{
-				PROFILER_SCOPED(&testProfiler, "Clear Window", 0x00ff00ff);
-				window.clear();
-			}
+			double elapsedTime = static_cast<double>(deltaTime.asMicroseconds()) / 1000.0;
 
 			{
-				PROFILER_SCOPED(&testProfiler, "Render Sprites", 0x00ffffff);
-				GO::World::EntityList& entityList = world.getEntities();
-				for (size_t i = 0; i < entityList.size(); i++)
+				PROFILER_SCOPED(&testProfiler, "Windows Loop", 0x0000ffff);
+				sf::Event event;
+				while (window.pollEvent(event))
 				{
-					GO::Entity& currentEntity = *entityList[i];
-					GO::SpriteComponent* spriteComponent = currentEntity.getComponent<GO::SpriteComponent>();
-					if (spriteComponent)
+					if (event.type == sf::Event::Closed)
 					{
-						spriteComponent->render(window);
+						window.close();
 					}
 				}
 			}
-		}
-
-		
 
 
-		//propMatrix.debugDraw();
-		//sf::Clock propagationTimer;
-
-		//{
-		//	PROFILER_SCOPED(&testProfiler, "Propagation", 0xff55d3ff);
-		//	std::future<int> result = threadPool.Submit([&testProfiler, &propMatrix]() -> int
-		//	{
-		//		testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_PROPAGATION);
-		//		propMatrix.updateCells();
-
-		//		return 1;
-		//	});
-
-		//	testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
-		//	result.get();
-		//	testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-		//}
-
-		//sf::Time propagationUpdateTime = propagationTimer.getElapsedTime();
-		//drawTimer(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), propagationUpdateTime, sf::Vector2f(500.0f, 500.0f));
+			GO::TaskSchedulerNew  scheduler(threadPool, unsigned int(GO::TaskIdentifiers::MaxNumberTasks), &testProfiler);
+			GO::SystemUpdateParams systemUpdateParams(world, testProfiler, threadPool, window, gameInstance, deltaTime);
 
 
-		drawFpsCounter(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), deltaTime);
-		//drawThreadId(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont());
-
-
-		{
-			PROFILER_SCOPED(&testProfiler, "Profiler Rendering", 0xffff00ff);
-			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_PROFILER_RENDER);
-
-			ProfilerNode* previousFrameNode = testProfiler.GetPreviousFrameRootNode();
-			if(previousFrameNode)
+			// Game Calculation Steps
 			{
-				float frameTime = GO_APIProfiler::TicksToMilliseconds(previousFrameNode->myAccumulator);
+				PROFILER_SCOPED(&testProfiler, "Calculate Game Step", 0xff0000ff);
+				AddSystemForUpdate(calcCombatDamageSystem, scheduler, systemUpdateParams);
+				AddSystemForUpdate(calcEntityMovementSystem, scheduler, systemUpdateParams);
+
+				// TODO(scarroll): Make the dependency on the system (and it's type traits) rather than on the identifier within it
+				GO::Task noopTask(unsigned int(GO::TaskIdentifiers::CalculateFinished), std::bind(Noop), GO_ProfilerTags::THREAD_TAG_CALC_SYNC_POINT_TASK);
+				scheduler.addTask(noopTask, unsigned int(GO::TaskIdentifiers::CalculateCombat), unsigned int(GO::TaskIdentifiers::CalculateMovement));
+			}
+
+			// Game Apply Steps
+			{
+				PROFILER_SCOPED(&testProfiler, "Apply Game Step", 0x00ff00ff);
+
+				GO::Task combatDamageTask(unsigned int(GO::TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				scheduler.addTask(combatDamageTask, unsigned int(GO::TaskIdentifiers::CalculateFinished));
+
+				GO::Task entityDeathTask(unsigned int(GO::TaskIdentifiers::ApplyEntityDeaths), std::bind(&ApplyEntityDeaths, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				scheduler.addTask(entityDeathTask, unsigned int(GO::TaskIdentifiers::ApplyCombatDamage));
+
+				GO::Task entitySpawnTask(unsigned int(GO::TaskIdentifiers::ApplyEntitySpawns), std::bind(&ApplyEntitySpawns, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				scheduler.addTask(entitySpawnTask, unsigned int(GO::TaskIdentifiers::ApplyEntityDeaths));
+
+				AddSystemForUpdate(movementSystem, scheduler, systemUpdateParams);
+			}
+
+
+			{
+				PROFILER_SCOPED(&testProfiler, "Waiting", 0xFFFF00FF);
+				scheduler.runPendingTasks();
+
+				// TODO(scarroll): This is required because runPendingTasks does not store/reset when it changes the tag
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
+			}
+
+
+
+			// Rendering
+			// TODO(scarroll): Move this into it's own thread so that it can be constantly running
+			//					and updating as fast as possible. It should not have data ties with
+			//					the current game state
+			{
+				{
+					PROFILER_SCOPED(&testProfiler, "Clear Window", 0x00ff00ff);
+					window.clear();
+				}
+
+				{
+					PROFILER_SCOPED(&testProfiler, "Render Sprites", 0x00ffffff);
+					GO::World::EntityList& entityList = world.getEntities();
+					for (size_t i = 0; i < entityList.size(); i++)
+					{
+						GO::Entity& currentEntity = *entityList[i];
+						GO::SpriteComponent* spriteComponent = currentEntity.getComponent<GO::SpriteComponent>();
+						if (spriteComponent)
+						{
+							spriteComponent->render(window);
+						}
+					}
+				}
+			}
+
+
+
+
+			//propMatrix.debugDraw();
+			//sf::Clock propagationTimer;
+
+			//{
+			//	PROFILER_SCOPED(&testProfiler, "Propagation", 0xff55d3ff);
+			//	std::future<int> result = threadPool.Submit([&testProfiler, &propMatrix]() -> int
+			//	{
+			//		testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_PROPAGATION);
+			//		propMatrix.updateCells();
+
+			//		return 1;
+			//	});
+
+			//	testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
+			//	result.get();
+			//	testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
+			//}
+
+			//sf::Time propagationUpdateTime = propagationTimer.getElapsedTime();
+			//drawTimer(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), propagationUpdateTime, sf::Vector2f(500.0f, 500.0f));
+
+
+			drawFpsCounter(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont(), deltaTime);
+			//drawThreadId(GO::GameInstance::GetInstance()->getMainWindow(), GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont());
+
+
+			{
+				PROFILER_SCOPED(&testProfiler, "Profiler Rendering", 0xffff00ff);
+				testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_PROFILER_RENDER);
 
 				sf::Vector2u windowSize = window.getSize();
-				sf::Vector2f profilerSize = sf::Vector2f(0.8f * windowSize.x, 0.1f * windowSize.y);
-				sf::Vector2f profilerOffset = sf::Vector2f(0.1f * windowSize.x, 0.1f * windowSize.y);
 
-				sf::RectangleShape background(profilerSize);
-				background.setPosition(profilerOffset);
-				background.setFillColor(sf::Color(0x44444411));
-				window.draw(background);
+				sf::Vector2f profilerSize = sf::Vector2f(0.9f * windowSize.x, 0.9f * windowSize.y);
+				sf::Vector2f profilerOffset = sf::Vector2f(0.05f * windowSize.x, 0.05f * windowSize.y);
 
-				GO_ProfilerRenderer::RenderProfilerLevel(previousFrameNode, profilerOffset, profilerSize, window);
-			
-				
-				const std::vector<ProfilerThreadEvent>& threadEvents = testProfiler.GetPreviousFrameThreadEvents();
+				if (testProfiler.GetPreviousFrameStartTime())
+				{
+					GO_ProfilerRenderer::RenderProfiler(testProfiler, testProfiler.GetPreviousFrameCallGraphRoots(), profilerOffset, profilerSize, window);
+				}
 
-				sf::Vector2f threadProfilerOffset = sf::Vector2f(0.1f * windowSize.x, 0.1f * windowSize.y);
-				threadProfilerOffset += sf::Vector2f(0.0f, profilerSize.y + 150.0f);
+				// TODO(scarroll): The thread tag profiler display is disabled now that the full call graph display is available
+				//					Investigate whether we can get a simplified version of the thread display from the call graph display
+				//if(testProfiler.GetPreviousFrameStartTime())
+				//{
+				//	const std::vector<ProfilerThreadEvent>& threadEvents = testProfiler.GetPreviousFrameThreadEvents();
+				//	sf::Vector2f threadProfilerOffset = sf::Vector2f(0.0f, 150.0f);
 
-				GO_ProfilerRenderer::RenderThreadEvents(threadEvents, testProfiler.GetPreviousFrameStartTime(), testProfiler.GetPreviousFrameEndTime(), threadProfilerOffset, profilerSize, window);
-				GO_ProfilerRenderer::RenderThreadEventTitles(threadEvents, sf::Vector2f(130.0f, 475.0f), window);
+				//	GO_ProfilerRenderer::RenderThreadEvents(threadEvents, testProfiler.GetPreviousFrameStartTime(), testProfiler.GetPreviousFrameEndTime(), threadProfilerOffset, profilerSize, window);
+				//	GO_ProfilerRenderer::RenderThreadEventTitles(threadEvents, sf::Vector2f(130.0f, 475.0f), window);
+				//}
 			}
-		}
-		testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
-		
+			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_MAIN_THREAD);
 
-		{
-			PROFILER_SCOPED(&testProfiler, "Rendering", 0xaa00aaff);
-			window.display();
-		}
 
-		// TODO: We shouldn't have to insert this one once the final events for each thread are drawn
-		testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
+			{
+				PROFILER_SCOPED(&testProfiler, "Rendering", 0xaa00aaff);
+				window.display();
+			}
+
+			// TODO: We shouldn't have to insert this one once the final events for each thread are drawn
+			testProfiler.PushThreadEvent(GO_ProfilerTags::THREAD_TAG_WAITING);
+		}
 		PROFILER_END_FRAME(testProfiler);
 	}
 

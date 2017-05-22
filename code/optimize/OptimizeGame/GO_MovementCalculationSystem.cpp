@@ -6,6 +6,7 @@
 #include "GO_Entity.h"
 #include "GO_MovementComponent.h"
 #include "GO_RandomMovementComponent.h"
+#include "GO_Profiler.h"
 
 namespace GO
 {
@@ -16,8 +17,30 @@ namespace GO
 
 	void MovementCalculationSystem::updateSystem(SystemUpdateParams& someUpdateParams)
 	{
+		GO_APIProfiler& profiler = someUpdateParams.myProfiler;
+		PROFILER_SCOPED(&profiler, "MovementCalculationSystem", 0x00ff00ff);
+
 		GeneratePlayerMovementBasedOnInput();
 		RandomlyMoveEnemies();
+
+		// TODO(scarroll): Setup profiler keybindings somewhere else
+		if (sf::Keyboard::isKeyPressed(sf::Keyboard::P))
+		{
+			someUpdateParams.myProfiler.PauseCollection();
+		}
+		else if(sf::Keyboard::isKeyPressed(sf::Keyboard::R))
+		{
+			someUpdateParams.myProfiler.ResumeCollection();
+		}
+
+		if(sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+		{
+			profiler.ViewPrevFrame();
+		}
+		else if(sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+		{
+			profiler.ViewNextFrame();
+		}
 	}
 
 	void MovementCalculationSystem::RandomlyMoveEnemies()

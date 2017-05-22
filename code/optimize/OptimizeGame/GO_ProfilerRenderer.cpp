@@ -35,59 +35,168 @@ namespace GO_ProfilerRenderer
 	}
 #pragma optimize("", on)
 
-	void RenderProfilerNode(long long aProfiledTime, const float aParentTotalTime, unsigned int aColor, const sf::Vector2f& aRegionSize, sf::Vector2f& aCurrentOffset, sf::RenderWindow& aWindow)
+	const CallGraphNode* locHoverCallGraphNode = nullptr;
+
+	void RenderCallGraphNode(GO_APIProfiler& aProfiler, const long long aFrameStartTime, const long long aFrameEndTime, const CallGraphNode& aCallGraphNode, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
 	{
-		const float childTime = GO_APIProfiler::TicksToMilliseconds(aProfiledTime);
-		const float childRectangleWidth = aRegionSize.x * (childTime / aParentTotalTime);
+		//PROFILER_SCOPED(&aProfiler, "RenderCallGraphNode", 0x60053dff);
 
-		sf::RectangleShape profilerOutline(sf::Vector2f(childRectangleWidth, aRegionSize.y));
-		profilerOutline.setPosition(sf::Vector2f(aCurrentOffset));
-		aCurrentOffset.x += childRectangleWidth;
+		const long long frameDuration = aFrameEndTime - aFrameStartTime;
+		const long long eventStartTime = aCallGraphNode.myStartTime - aFrameStartTime;
+		const long long eventEndTime = aCallGraphNode.myEndTime - aFrameStartTime;
 
-		profilerOutline.setFillColor(sf::Color(aColor));
+		GO_ASSERT(eventStartTime >= 0, "Event started before the frame and this is currently unsupported");
+		GO_ASSERT(eventEndTime >= 0, "Event ended before our frame started");
+		GO_ASSERT(eventEndTime <= frameDuration, "Event ended after the frame it was contained in did");
+
+		const long long eventDuration = eventEndTime - eventStartTime;
+		GO_ASSERT(eventDuration >= 0, "The event took 'negative' time");
+
+		//// Skip over any that can be merged together
+		//// TODO(scarroll): We need to keep track of the 'current' end time so that we can compare to a moving end point for merging
+		//if (pte.myThreadTag == threadSpecific.myLastThreadTag &&
+		//	(pte.myStartTime - threadSpecific.myLastEventStartTime) < ourProfilerMergeTolerance)
+		//{
+		//	continue;
+		//}
+
+		const double eventLengthPercentage = (eventDuration / (float)frameDuration);
+		GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as taking negative percent of a frame");
+		GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as taking more than 100% of a frame");
+
+		const double eventStartPercentage = (eventStartTime / (float)frameDuration);
+		GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as starting before a frame");
+		GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as starting after a frame");
+
+		sf::Vector2f rectSize;
+		rectSize.x = aRegionSize.x * eventLengthPercentage;
+		rectSize.y = 10.0f;
+
+		sf::Vector2f rectPosition;
+		rectPosition.x = aStartingPosition.x + (aRegionSize.x * eventStartPercentage);
+		rectPosition.y = aStartingPosition.y;
+
+		GO_ASSERT(rectPosition.x >= aStartingPosition.x, "The event will be drawn before the timeline");
+		GO_ASSERT(rectSize.x >= 0.0f, "The event will be drawn with negative size");
+		GO_ASSERT(rectPosition.x <= aStartingPosition.x + aRegionSize.x, "Bar goes beyond the bounds given to us");
+		//GO_ASSERT((rectPosition.x + rectSize.x) <= (aStartingPosition.x + aRegionSize.x), "Bar extends beyond the bounds of the profiler display");
+
+		sf::RectangleShape profilerOutline(rectSize);
+		profilerOutline.setPosition(rectPosition);
+		sf::Color eventColor = sf::Color(aCallGraphNode.myColor | 0xff);
+		profilerOutline.setFillColor(eventColor);
 
 		aWindow.draw(profilerOutline);
+
+
+		const sf::Vector2i& mouseCoordinates = sf::Mouse::getPosition(aWindow);
+		if(mouseCoordinates.x >= rectPosition.x && mouseCoordinates.x < rectPosition.x + rectSize.x &&
+			mouseCoordinates.y >= rectPosition.y && mouseCoordinates.y < rectPosition.y + rectSize.y)
+		{
+			locHoverCallGraphNode = &aCallGraphNode;
+		}
 	}
 
-	void RenderProfilerLevel(ProfilerNode* aLevelParentNode, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
+	void RenderThreadChildrenCallGraphTree(GO_APIProfiler& aProfiler, const long long aFrameStartTime, const long long aFrameEndTime, const CallGraphNode& aRootNode, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
 	{
-		const float parentTotalTime = GO_APIProfiler::TicksToMilliseconds(aLevelParentNode->myAccumulator);
-		sf::Vector2f currentOffset = aStartingPosition;
-
-		std::vector<ProfilerNode*> reversedOrderChildren;
-		// Render children nodes
-		ProfilerNode* childNode = aLevelParentNode->myFirstChild;
-		while (childNode)
+		const sf::Vector2f subChildStartingPosition = aStartingPosition + sf::Vector2f(0, 10.0f);
+		const CallGraphNode* currentChild = aRootNode.myLastChild;
+		while (currentChild != nullptr)
 		{
-			reversedOrderChildren.push_back(childNode);
-			childNode = childNode->mySibling;
+			RenderCallGraphNode(aProfiler, aFrameStartTime, aFrameEndTime, *currentChild, aStartingPosition, aRegionSize, aWindow);
+
+			// Render the children of the current child node [on the line below this one]
+			RenderThreadChildrenCallGraphTree(aProfiler, aFrameStartTime, aFrameEndTime, *currentChild, subChildStartingPosition, aRegionSize, aWindow);
+			currentChild = currentChild->myPrevSibling;
 		}
+	}
 
-		while (reversedOrderChildren.size())
+	void RenderThreadCallGraph(GO_APIProfiler& aProfiler, const CallGraphNode& aRootNode, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
+	{
+		PROFILER_SCOPED(&aProfiler, "RenderThreadCallGraph", 0x960960ff);
+		const long long frameDuration = aRootNode.myEndTime - aRootNode.myStartTime;
+		GO_ASSERT(frameDuration > 0, "Cannot handle 0 length frames currently");
+
+		RenderThreadChildrenCallGraphTree(aProfiler, aRootNode.myStartTime, aRootNode.myEndTime, aRootNode, aStartingPosition, aRegionSize, aWindow);
+	}
+
+	void RenderProfiler(GO_APIProfiler& aProfiler, const GO_APIProfiler::FrameCallGraphRoots& someRootNodes, const sf::Vector2f& aStartingPosition, const sf::Vector2f& aRegionSize, sf::RenderWindow& aWindow)
+	{
+		PROFILER_SCOPED(&aProfiler, "RenderProfiler", 0xbf0b7aff);
+		locHoverCallGraphNode = nullptr;
+
+		// Count the number of actually used threads so the chart can be sized to fit
+		// TODO(scarroll): Use the thread maximum here instead of assuming it is UCHAR_MAX
+		int numUsedThreads = 0;
+		for (int i = 0; i < UCHAR_MAX; i++)
 		{
-			ProfilerNode* childNode = reversedOrderChildren.back();
-			reversedOrderChildren.erase(reversedOrderChildren.end() - 1);
-
-			RenderProfilerNode(childNode->myAccumulator, parentTotalTime, childNode->myColor, aRegionSize, currentOffset, aWindow);
-			childNode = childNode->mySibling;
-		}
-
-		// Render a node that is the 'unknown' time that wasn't tracked for this level
-		// Count up the time of the children
-		long long totalTicks = 0;
-		{
-			ProfilerNode* childNode = aLevelParentNode->myFirstChild;
-			while (childNode)
+			if (someRootNodes[i]->myLastChild != nullptr)
 			{
-				totalTicks += childNode->myAccumulator;
-				childNode = childNode->mySibling;
+				numUsedThreads++;
 			}
 		}
 
-		const long long unknownTime = aLevelParentNode->myAccumulator - totalTicks;
-		const float unknwonRectangleWidth = aRegionSize.x * (unknownTime / parentTotalTime);
+		const sf::Vector2f backgroundSize = sf::Vector2f(aRegionSize.x, 15 * 6 * numUsedThreads);
+		sf::RectangleShape background(backgroundSize);
+		background.setPosition(aStartingPosition);
+		background.setFillColor(sf::Color(0x22814C66));
+		aWindow.draw(background);
 
-		RenderProfilerNode(unknownTime, parentTotalTime, 0xffffffff, aRegionSize, currentOffset, aWindow);
+		int numThreadsRendered = 0;
+		for (int i = UCHAR_MAX - 1; i >= 0; i--)
+		{
+			// Skip any threads that don't have any calls on them this frame
+			if (someRootNodes[i]->myLastChild == nullptr)
+			{
+				continue;
+			}
+
+			const sf::Vector2f threadStartingOffset = aStartingPosition + sf::Vector2f(0, 15 * 6 * numThreadsRendered);
+			RenderThreadCallGraph(aProfiler, *(someRootNodes[i]), threadStartingOffset, aRegionSize, aWindow);
+
+			if (locHoverCallGraphNode)
+			{
+				sf::Text text;
+				text.setFont(GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont());
+				text.setCharacterSize(20.0f);
+
+				const sf::Vector2i mouseCoordinates = sf::Mouse::getPosition(aWindow);
+				const sf::Vector2f lineSpacing = sf::Vector2f(0, text.getCharacterSize() + 3.0f);
+
+				sf::Vector2f currentOffset = sf::Vector2f(mouseCoordinates.x, mouseCoordinates.y) + sf::Vector2f(25.0f, 0.0f);
+
+
+				{
+					text.setString(locHoverCallGraphNode->myName);
+					text.setPosition(currentOffset);
+					aWindow.draw(text);
+
+					currentOffset += lineSpacing;
+				}
+
+				{
+					const long long frameDuration = someRootNodes[i]->myEndTime - someRootNodes[i]->myStartTime;
+					const long long eventDuration = locHoverCallGraphNode->myEndTime - locHoverCallGraphNode->myStartTime;
+					const float eventDurationMilliseconds = GO_APIProfiler::TicksToMilliseconds(eventDuration);
+
+					const int Int64TextWidth = 20;
+					char buffer[Int64TextWidth];
+
+					sprintf_s(buffer, Int64TextWidth, "%.2f ms", eventDurationMilliseconds);
+
+					text.setString(buffer);
+					text.setPosition(currentOffset);
+					aWindow.draw(text);
+
+					currentOffset += lineSpacing;
+				}
+			}
+
+
+			numThreadsRendered++;
+		}
+
+		locHoverCallGraphNode = nullptr;
 	}
 
 	sf::Color locGetThreadTagColor(unsigned char aThreadTag)
