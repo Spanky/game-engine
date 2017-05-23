@@ -60,13 +60,13 @@ namespace GO_ProfilerRenderer
 		//	continue;
 		//}
 
-		const double eventLengthPercentage = (eventDuration / (float)frameDuration);
-		GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as taking negative percent of a frame");
-		GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as taking more than 100% of a frame");
+		const float eventLengthPercentage = (eventDuration / (float)frameDuration);
+		GO_ASSERT(eventLengthPercentage >= 0.0f, "Event was calculated as taking negative percent of a frame");
+		GO_ASSERT(eventLengthPercentage <= 1.0f, "Event was calculated as taking more than 100% of a frame");
 
-		const double eventStartPercentage = (eventStartTime / (float)frameDuration);
-		GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as starting before a frame");
-		GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as starting after a frame");
+		const float eventStartPercentage = (eventStartTime / (float)frameDuration);
+		GO_ASSERT(eventLengthPercentage >= 0.0f, "Event was calculated as starting before a frame");
+		GO_ASSERT(eventLengthPercentage <= 1.0f, "Event was calculated as starting after a frame");
 
 		sf::Vector2f rectSize;
 		rectSize.x = aRegionSize.x * eventLengthPercentage;
@@ -158,7 +158,7 @@ namespace GO_ProfilerRenderer
 			{
 				sf::Text text;
 				text.setFont(GO::GameInstance::GetInstance()->getHacksGlobalResources().getDefaultFont());
-				text.setCharacterSize(20.0f);
+				text.setCharacterSize(20);
 
 				const sf::Vector2i mouseCoordinates = sf::Mouse::getPosition(aWindow);
 				const sf::Vector2f lineSpacing = sf::Vector2f(0, text.getCharacterSize() + 3.0f);
@@ -361,13 +361,13 @@ namespace GO_ProfilerRenderer
 				continue;
 			}
 
-			const double eventLengthPercentage = (eventDuration / (float)frameDuration);
-			GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as taking negative percent of a frame");
-			GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as taking more than 100% of a frame");
+			const float eventLengthPercentage = (eventDuration / (float)frameDuration);
+			GO_ASSERT(eventLengthPercentage >= 0.0f, "Event was calculated as taking negative percent of a frame");
+			GO_ASSERT(eventLengthPercentage <= 1.0f, "Event was calculated as taking more than 100% of a frame");
 
-			const double eventStartPercentage = (eventStartTime / (float)frameDuration);
-			GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as starting before a frame");
-			GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as starting after a frame");
+			const float eventStartPercentage = (eventStartTime / (float)frameDuration);
+			GO_ASSERT(eventLengthPercentage >= 0.0f, "Event was calculated as starting before a frame");
+			GO_ASSERT(eventLengthPercentage <= 1.0f, "Event was calculated as starting after a frame");
 
 			sf::Vector2f rectSize;
 			rectSize.x = aRegionSize.x * eventLengthPercentage;
@@ -420,13 +420,13 @@ namespace GO_ProfilerRenderer
 			const long long eventDuration = eventEndTime - eventStartTime;
 			GO_ASSERT(eventDuration >= 0, "The event took 'negative' time");
 
-			const double eventLengthPercentage = (eventDuration / (float)frameDuration);
-			GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as taking negative percent of a frame");
-			GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as taking more than 100% of a frame");
+			const float eventLengthPercentage = (eventDuration / (float)frameDuration);
+			GO_ASSERT(eventLengthPercentage >= 0.0f, "Event was calculated as taking negative percent of a frame");
+			GO_ASSERT(eventLengthPercentage <= 1.0f, "Event was calculated as taking more than 100% of a frame");
 
-			const double eventStartPercentage = (eventStartTime / (float)frameDuration);
-			GO_ASSERT(eventLengthPercentage >= 0.0, "Event was calculated as starting before a frame");
-			GO_ASSERT(eventLengthPercentage <= 1.0, "Event was calculated as starting after a frame");
+			const float eventStartPercentage = (eventStartTime / (float)frameDuration);
+			GO_ASSERT(eventLengthPercentage >= 0.0f, "Event was calculated as starting before a frame");
+			GO_ASSERT(eventLengthPercentage <= 1.0f, "Event was calculated as starting after a frame");
 
 			sf::Vector2f rectSize;
 			rectSize.x = aRegionSize.x * eventLengthPercentage;

@@ -434,24 +434,26 @@ namespace GO
 				// sqrt(sum * 2 + 0.25) = n + 0.5
 				// sqrt(sum * 2 + 0.25) - 0.5 = n
 
-				std::vector<int> taskSumCounts(aTotalTaskCount);
+				std::vector<size_t> taskSumCounts(aTotalTaskCount);
 
-				std::vector<std::pair<int, int>> taskIndices(aTotalTaskCount);
-				for(int i = 0; i < aTotalTaskCount; i++)
+				using indexPair = std::pair<size_t, size_t>;
+
+				std::vector<indexPair> taskIndices(aTotalTaskCount);
+				for(unsigned int i = 0; i < aTotalTaskCount; i++)
 				{
-					int sumRequired = (i > 0) ? (taskSumCounts[i - 1] + numIterationsPerTask) : numIterationsPerTask;
+					size_t sumRequired = (i > 0) ? (taskSumCounts[i - 1] + numIterationsPerTask) : numIterationsPerTask;
 					taskSumCounts[i] = sumRequired;
 
-					std::pair<int, int> indices;
+					indexPair indices;
 					indices.first = (i > 0) ? taskIndices[i - 1].second : 0;
 					indices.second = std::round(sqrt(sumRequired * 2 + 0.25) - 0.5);
 
 					taskIndices[i] = indices;
 				}
 
-				for(int i = 0; i < aTotalTaskCount; i++)
+				for(unsigned int i = 0; i < aTotalTaskCount; i++)
 				{
-					std::pair<int, int>& indices = taskIndices[i];
+					indexPair& indices = taskIndices[i];
 
 					std::swap(indices.first, indices.second);
 					indices.first = entityListSize - indices.first - 1;
