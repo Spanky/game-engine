@@ -31,9 +31,6 @@
     <Filter Include="HACKS">
       <UniqueIdentifier>{99436bc8-ab31-4669-98f7-5987f14e2853}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Scheduling">
-      <UniqueIdentifier>{5a0211c3-6c6d-4749-a1aa-66bdc72bd0df}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Gameplay">
       <UniqueIdentifier>{cf53e0af-ac13-4bb4-a9c5-3deea80424ed}</UniqueIdentifier>
     </Filter>
@@ -101,12 +98,6 @@
     </ClCompile>
     <ClCompile Include="GO_HacksGlobalResources.cpp">
       <Filter>HACKS</Filter>
-    </ClCompile>
-    <ClCompile Include="GO_TaskScheduler.cpp">
-      <Filter>Scheduling</Filter>
-    </ClCompile>
-    <ClCompile Include="GO_ComponentUpdater.cpp">
-      <Filter>Scheduling</Filter>
     </ClCompile>
     <ClCompile Include="GO_PropagationMatrix.cpp">
       <Filter>Gameplay\Systems\Propagation</Filter>
@@ -193,12 +184,6 @@
     </ClInclude>
     <ClInclude Include="GO_Gameworks.h">
       <Filter>System</Filter>
-    </ClInclude>
-    <ClInclude Include="GO_TaskScheduler.h">
-      <Filter>Scheduling</Filter>
-    </ClInclude>
-    <ClInclude Include="GO_ComponentUpdater.h">
-      <Filter>Scheduling</Filter>
     </ClInclude>
     <ClInclude Include="GO_RandomMovementComponent.h">
       <Filter>Entity Systems\Components</Filter>

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "GO_TaskScheduler.h"
-
 namespace sf
 {
 	class RenderWindow;
@@ -28,7 +26,6 @@ namespace GO
 
 		sf::RenderWindow& getMainWindow() { return myWindow; }
 		Gameworks& getGameworks() { return myGameworks; }
-		TaskScheduler& getTaskScheduler() { return myTaskScheduler; }
 
 		HacksGlobalResources& getHacksGlobalResources() { return *myHacksGlobalResources; }
 
@@ -36,7 +33,6 @@ namespace GO
 		sf::RenderWindow& myWindow;
 
 		HacksGlobalResources* myHacksGlobalResources;
-		TaskScheduler myTaskScheduler;
 
 		Gameworks& myGameworks;
 	};

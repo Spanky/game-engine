@@ -14,7 +14,6 @@
 
 #include "GO_AssertMutex.h"
 #include "GO_World.h"
-#include "GO_TaskScheduler.h"
 #include "GO_TaskSchedulerNew.h"
 #include "GO_Entity.h"
 #include "GO_GameInstance.h"

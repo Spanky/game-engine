@@ -11,10 +11,6 @@
 #include "GO_RandomMovementComponent.h"
 #include "GO_HealthComponent.h"
 
-// TODO(scarroll): This is required for the createComponent call that registers components with the legacy task scheduler
-#include "GO_TaskScheduler.h"
-#include "GO_GameInstance.h"
-
 namespace GO
 {
 	void ApplyEntitySpawnsSystem::updateSystem(SystemUpdateParams& someUpdateParams)

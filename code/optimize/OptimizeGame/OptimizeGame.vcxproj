@@ -173,7 +173,6 @@
     <ClCompile Include="GO_ApplyEntitySpawnsSystem.cpp" />
     <ClCompile Include="GO_AssertMutex.cpp" />
     <ClCompile Include="GO_CalculateCombatDamageSystem.cpp" />
-    <ClCompile Include="GO_ComponentUpdater.cpp" />
     <ClCompile Include="GO_Entity.cpp" />
     <ClCompile Include="GO_EntityComponent.cpp" />
     <ClCompile Include="GO_EventBroker.cpp" />
@@ -192,7 +191,6 @@
     <ClCompile Include="GO_PropagationRow.cpp" />
     <ClCompile Include="GO_SpriteComponent.cpp" />
     <ClCompile Include="GO_StatusEffectComponent.cpp" />
-    <ClCompile Include="GO_TaskScheduler.cpp" />
     <ClCompile Include="GO_TaskSchedulerNew.cpp" />
     <ClCompile Include="GO_Thread.cpp" />
     <ClCompile Include="GO_ThreadPool.cpp" />
@@ -211,7 +209,6 @@
     <ClInclude Include="GO_Assert.h" />
     <ClInclude Include="GO_AssertMutex.h" />
     <ClInclude Include="GO_CalculateCombatDamageSystem.h" />
-    <ClInclude Include="GO_ComponentUpdater.h" />
     <ClInclude Include="GO_Entity.h" />
     <ClInclude Include="GO_EntityComponent.h" />
     <ClInclude Include="GO_EventBroker.h" />
@@ -235,7 +232,6 @@
     <ClInclude Include="GO_SpriteComponent.h" />
     <ClInclude Include="GO_StatusEffectComponent.h" />
     <ClInclude Include="GO_TaskIdentifiers.h" />
-    <ClInclude Include="GO_TaskScheduler.h" />
     <ClInclude Include="GO_TaskSchedulerNew.h" />
     <ClInclude Include="GO_Thread.h" />
     <ClInclude Include="GO_ThreadJoiner.h" />
