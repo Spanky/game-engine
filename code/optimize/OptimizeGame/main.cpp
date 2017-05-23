@@ -8,6 +8,8 @@
 #include "GO_ApplyCombatDamageSystem.h"
 #include "GO_ApplyEntityDeathsSystem.h"
 #include "GO_ApplyEntitySpawnsSystem.h"
+#include "GO_UpdateInputSystem.h"
+#include "GO_DebugInputSystem.h"
 
 #include "GO_EventBroker.h"
 #include "GO_ThreadUtils.h"
@@ -31,6 +33,7 @@
 #include "GO_StatusEffectComponent.h"
 #include "GO_SpriteComponent.h"
 #include "GO_RandomMovementComponent.h"
+#include "GO_PlayerInputComponent.h"
 
 #include "GO_PropagationMatrix.h"
 #include "GO_PropagationRow.h"
@@ -362,6 +365,7 @@ void RunGame()
 	playerEntity->createComponent<GO::SpriteComponent>();
 	playerEntity->createComponent<GO::MovementComponent>();
 	playerEntity->createComponent<GO::HealthComponent>();
+	playerEntity->createComponent<GO::PlayerInputComponent>();
 
 	for (int i = 0; i < 500; ++i)
 	{
@@ -386,6 +390,8 @@ void RunGame()
 	GO::ApplyCombatDamageSystem applyCombatDamageSystem;
 	GO::ApplyEntityDeathsSystem applyEntityDeathsSystem;
 	GO::ApplyEntitySpawnsSystem applyEntitySpawnsSystem;
+	GO::UpdateInputSystem updateInputSystem;
+	GO::DebugInputSystem debugInputSystem;
 
 	window.setVerticalSyncEnabled(true);
 
@@ -424,10 +430,11 @@ void RunGame()
 				PROFILER_SCOPED(&testProfiler, "Calculate Game Step", 0xff0000ff);
 				AddSystemForUpdate(calcCombatDamageSystem, scheduler, systemUpdateParams);
 				AddSystemForUpdate(calcEntityMovementSystem, scheduler, systemUpdateParams);
+				AddSystemForUpdate(updateInputSystem, scheduler, systemUpdateParams);
 
 				// TODO(scarroll): Make the dependency on the system (and it's type traits) rather than on the identifier within it
 				GO::Task noopTask(unsigned int(GO::TaskIdentifiers::CalculateFinished), std::bind(Noop), GO_ProfilerTags::THREAD_TAG_CALC_SYNC_POINT_TASK);
-				scheduler.addTask(noopTask, unsigned int(GO::TaskIdentifiers::CalculateCombat), unsigned int(GO::TaskIdentifiers::CalculateMovement));
+				scheduler.addTask(noopTask, unsigned int(GO::TaskIdentifiers::CalculateCombat), unsigned int(GO::TaskIdentifiers::CalculateMovement), unsigned int(GO::TaskIdentifiers::UpdateInput));
 			}
 
 			// Game Apply Steps
@@ -438,6 +445,7 @@ void RunGame()
 				AddSystemForUpdate(applyEntityDeathsSystem, scheduler, systemUpdateParams);
 				AddSystemForUpdate(applyEntitySpawnsSystem, scheduler, systemUpdateParams);
 				AddSystemForUpdate(movementSystem, scheduler, systemUpdateParams);
+				AddSystemForUpdate(debugInputSystem, scheduler, systemUpdateParams);
 			}
 
 

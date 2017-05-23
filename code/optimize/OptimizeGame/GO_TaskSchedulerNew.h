@@ -136,6 +136,7 @@ namespace GO
 		void addTask(Task aTask);
 		void addTask(Task aTask, unsigned int aTaskDependencyUniqueID);
 		void addTask(Task aTask, unsigned int aTaskDependencyUniqueID, unsigned int aSecondTaskDependencyUniqueID);
+		void addTask(Task aTask, unsigned int aTaskDependencyUniqueID, unsigned int aSecondTaskDependencyUniqueID, unsigned int aThirdTaskDependencyUniqueID);
 		void runPendingTasks();
 
 	private:

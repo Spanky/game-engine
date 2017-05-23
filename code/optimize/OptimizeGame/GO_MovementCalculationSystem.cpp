@@ -22,28 +22,6 @@ namespace GO
 
 		GeneratePlayerMovementBasedOnInput();
 		RandomlyMoveEnemies();
-
-		// TODO(scarroll): Setup profiler keybindings somewhere else
-		if(someUpdateParams.myRenderWindow.hasFocus() && !sf::Keyboard::isKeyPressed(sf::Keyboard::LSystem))
-		{
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::P))
-			{
-				someUpdateParams.myProfiler.PauseCollection();
-			}
-			else if (sf::Keyboard::isKeyPressed(sf::Keyboard::R))
-			{
-				someUpdateParams.myProfiler.ResumeCollection();
-			}
-
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-			{
-				profiler.ViewPrevFrame();
-			}
-			else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-			{
-				profiler.ViewNextFrame();
-			}
-		}
 	}
 
 	void MovementCalculationSystem::RandomlyMoveEnemies()

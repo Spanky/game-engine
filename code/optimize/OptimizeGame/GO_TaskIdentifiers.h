@@ -6,11 +6,13 @@ namespace GO
 	{
 		CalculateCombat,
 		CalculateMovement,
+		UpdateInput,
 		CalculateFinished,
 		ApplyCombatDamage,
 		ApplyEntityDeaths,
 		ApplyEntitySpawns,
 		ApplyEntityMovement,
+		DebugInput,
 		MaxNumberTasks
 	};
 }

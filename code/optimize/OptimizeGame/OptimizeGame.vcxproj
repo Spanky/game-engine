@@ -173,6 +173,7 @@
     <ClCompile Include="GO_ApplyEntitySpawnsSystem.cpp" />
     <ClCompile Include="GO_AssertMutex.cpp" />
     <ClCompile Include="GO_CalculateCombatDamageSystem.cpp" />
+    <ClCompile Include="GO_DebugInputSystem.cpp" />
     <ClCompile Include="GO_Entity.cpp" />
     <ClCompile Include="GO_EntityComponent.cpp" />
     <ClCompile Include="GO_EventBroker.cpp" />
@@ -195,6 +196,7 @@
     <ClCompile Include="GO_Thread.cpp" />
     <ClCompile Include="GO_ThreadPool.cpp" />
     <ClCompile Include="GO_UniformThreadGroup.cpp" />
+    <ClCompile Include="GO_UpdateInputSystem.cpp" />
     <ClCompile Include="GO_World.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="StableHeaders.cpp">
@@ -209,6 +211,7 @@
     <ClInclude Include="GO_Assert.h" />
     <ClInclude Include="GO_AssertMutex.h" />
     <ClInclude Include="GO_CalculateCombatDamageSystem.h" />
+    <ClInclude Include="GO_DebugInputSystem.h" />
     <ClInclude Include="GO_Entity.h" />
     <ClInclude Include="GO_EntityComponent.h" />
     <ClInclude Include="GO_EventBroker.h" />
@@ -222,6 +225,7 @@
     <ClInclude Include="GO_MovementApplySystem.h" />
     <ClInclude Include="GO_MovementCalculationSystem.h" />
     <ClInclude Include="GO_MovementComponent.h" />
+    <ClInclude Include="GO_PlayerInputComponent.h" />
     <ClInclude Include="GO_Profiler.h" />
     <ClInclude Include="GO_ProfilerRenderer.h" />
     <ClInclude Include="GO_ProfilerTags.h" />
@@ -239,6 +243,7 @@
     <ClInclude Include="GO_ThreadSafeQueue.h" />
     <ClInclude Include="GO_ThreadUtils.h" />
     <ClInclude Include="GO_UniformThreadGroup.h" />
+    <ClInclude Include="GO_UpdateInputSystem.h" />
     <ClInclude Include="GO_World.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="StableHeaders.h" />

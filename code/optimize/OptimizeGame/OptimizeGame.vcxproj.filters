@@ -150,6 +150,12 @@
     <ClCompile Include="GO_ApplyEntitySpawnsSystem.cpp">
       <Filter>Entity Systems\Systems</Filter>
     </ClCompile>
+    <ClCompile Include="GO_UpdateInputSystem.cpp">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_DebugInputSystem.cpp">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StableHeaders.h">
@@ -267,6 +273,15 @@
       <Filter>Entity Systems\Systems</Filter>
     </ClInclude>
     <ClInclude Include="GO_ApplyEntitySpawnsSystem.h">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_UpdateInputSystem.h">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_PlayerInputComponent.h">
+      <Filter>Entity Systems\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_DebugInputSystem.h">
       <Filter>Entity Systems\Systems</Filter>
     </ClInclude>
   </ItemGroup>

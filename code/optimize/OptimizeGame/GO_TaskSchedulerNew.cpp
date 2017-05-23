@@ -53,6 +53,25 @@ namespace GO
 		}
 	}
 
+	void TaskSchedulerNew::addTask(Task aTask, unsigned int aTaskDependencyUniqueID, unsigned int aSecondTaskDependencyUniqueID, unsigned int aThirdTaskDependencyUniqueID)
+	{
+		GO::AssertMutexLock assertLock(myTaskListAssertMutex);
+		myTasks[aTask.getUniqueID()] = aTask;
+
+		{
+			std::lock_guard<std::mutex> lock(myTaskCompleteMutex);
+
+			myTaskDependencies[aTaskDependencyUniqueID].addDependentTask(aTask.getUniqueID());
+			myTasksBlockedByCounts[aTask.getUniqueID()]++;
+
+			myTaskDependencies[aSecondTaskDependencyUniqueID].addDependentTask(aTask.getUniqueID());
+			myTasksBlockedByCounts[aTask.getUniqueID()]++;
+
+			myTaskDependencies[aThirdTaskDependencyUniqueID].addDependentTask(aTask.getUniqueID());
+			myTasksBlockedByCounts[aTask.getUniqueID()]++;
+		}
+	}
+
 	void TaskSchedulerNew::runPendingTasks()
 	{
 		std::unique_lock<std::mutex> lock(myTaskCompleteMutex);
