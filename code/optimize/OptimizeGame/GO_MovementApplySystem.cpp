@@ -62,7 +62,7 @@ namespace GO
 			{
 				if (movementComponent->myHasMovementQueued)
 				{
-					movementComponent->myTileMovementCursor += (0.5f / deltaTime.asMilliseconds());
+					movementComponent->myTileMovementCursor += (deltaTime.asSeconds() * movementComponent->myTilesPerSecond);
 
 					sf::Vector2i lerpedPosition = LerpTiles(movementComponent->myCurrentTileIndex, movementComponent->myDestinationTileIndex, movementComponent->myTileMovementCursor);
 					currentEntity->setPosition(lerpedPosition);

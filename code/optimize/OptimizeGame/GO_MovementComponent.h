@@ -12,6 +12,7 @@ namespace GO
 			, myCurrentTileIndex(0, 0)
 			, myDestinationTileIndex(0, 0)
 			, myTileMovementCursor(0.0f)
+			, myTilesPerSecond(4.0f)
 			, myHasMovementQueued(false)
 		{
 		}
@@ -19,6 +20,7 @@ namespace GO
 		sf::Vector2i myCurrentTileIndex;
 		sf::Vector2i myDestinationTileIndex;
 		float myTileMovementCursor;
+		float myTilesPerSecond;
 
 		// TODO: How do we track things like having already queued up a movement request for this entity?
 		bool myHasMovementQueued;

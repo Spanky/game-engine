@@ -102,19 +102,19 @@ namespace GO
 		{
 			sf::Vector2i desiredTile = movementComponent->myCurrentTileIndex;
 
-			if (playerInputComponent->wasKeyPressedThisFrame(sf::Keyboard::W))
+			if (playerInputComponent->myKeyStatesThisFrame[sf::Keyboard::W])
 			{
 				desiredTile.y--;
 			}
-			else if (playerInputComponent->wasKeyPressedThisFrame(sf::Keyboard::S))
+			else if (playerInputComponent->myKeyStatesThisFrame[sf::Keyboard::S])
 			{
 				desiredTile.y++;
 			}
-			else if (playerInputComponent->wasKeyPressedThisFrame(sf::Keyboard::D))
+			else if (playerInputComponent->myKeyStatesThisFrame[sf::Keyboard::D])
 			{
 				desiredTile.x++;
 			}
-			else if (playerInputComponent->wasKeyPressedThisFrame(sf::Keyboard::A))
+			else if (playerInputComponent->myKeyStatesThisFrame[sf::Keyboard::A])
 			{
 				desiredTile.x--;
 			}
