@@ -29,7 +29,7 @@ namespace GO
 	struct GameUpdateSystemTypeTraits<MovementCalculationSystem>
 	{
 		static constexpr TaskIdentifiers ourTaskIdentifier = TaskIdentifiers::CalculateMovement;
-		typedef GameUpdateSystemNoDependencies ourTaskDependencies;
+		typedef GameUpdateSystemOneDependencies<unsigned int(TaskIdentifiers::UpdateInput)> ourTaskDependencies;
 	};
 
 	template<>
