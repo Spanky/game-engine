@@ -6,7 +6,7 @@
 
 namespace GO
 {
-	class CombatDamageMessage;
+	struct CombatDamageMessage;
 
 	class ApplyCombatDamageSystem : public GameUpdateSystem
 	{

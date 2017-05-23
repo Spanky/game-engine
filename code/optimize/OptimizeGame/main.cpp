@@ -6,6 +6,8 @@
 #include "GO_MovementApplySystem.h"
 #include "GO_CalculateCombatDamageSystem.h"
 #include "GO_ApplyCombatDamageSystem.h"
+#include "GO_ApplyEntityDeathsSystem.h"
+#include "GO_ApplyEntitySpawnsSystem.h"
 
 #include "GO_EventBroker.h"
 #include "GO_ThreadUtils.h"
@@ -239,46 +241,9 @@ void TestFrameProcessor()
 	frameProcessors = nullptr;
 }
 
-void ApplyEntityDeaths(const GO::SystemUpdateParams& someUpdateParams)
-{
-	PROFILER_SCOPED(&someUpdateParams.myProfiler, "ApplyEntityDeaths", 0xFFFFFFFF);
-	GO::World& world = someUpdateParams.myWorld;
-	const GO::World::EntityList& entityList = world.getEntities();
-
-	for(const GO::EntityDeathMessage& deathMsg : GO::EventBroker::GetDeathMessages())
-	{
-		const size_t deadEntityId = deathMsg.myDeadEntityId;
-		
-		GO::World::EntityList::const_iterator deadIter = std::find_if(entityList.begin(), entityList.end(),
-			[deadEntityId](const GO::Entity* anEntity)
-		{
-			return anEntity->getId() == deadEntityId;
-		});
-
-		// We may have already destroyed this entity so don't bother destroying it again
-		// (Multiple things could have all killed this entity in the same frame)
-		if(deadIter != entityList.end())
-		{
-			world.destroyEntity(*deadIter);
-		}
-	}
-
-	GO::EventBroker::ClearDeathMessages();
-}
-
 void ApplyEntitySpawns(const GO::SystemUpdateParams& someUpdateParams)
 {
-	GO::World& world = someUpdateParams.myWorld;
 
-	for(const GO::EntitySpawnMessage& spawnMsg : GO::EventBroker::GetSpawnMessages())
-	{
-		GO::Entity* entity = world.createEntity();
-		entity->createComponent<GO::SpriteComponent>();
-		entity->createComponent<GO::RandomMovementComponent>();
-		entity->createComponent<GO::HealthComponent>();
-	}
-
-	GO::EventBroker::ClearSpawnMessages();
 }
 
 
@@ -420,6 +385,8 @@ void RunGame()
 	GO::MovementCalculationSystem calcEntityMovementSystem(world);
 	GO::MovementApplySystem movementSystem(world);
 	GO::ApplyCombatDamageSystem applyCombatDamageSystem;
+	GO::ApplyEntityDeathsSystem applyEntityDeathsSystem;
+	GO::ApplyEntitySpawnsSystem applyEntitySpawnsSystem;
 
 	window.setVerticalSyncEnabled(true);
 
@@ -469,15 +436,8 @@ void RunGame()
 				PROFILER_SCOPED(&testProfiler, "Apply Game Step", 0x00ff00ff);
 
 				AddSystemForUpdate(applyCombatDamageSystem, scheduler, systemUpdateParams);
-				//GO::Task combatDamageTask(unsigned int(GO::TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-				//scheduler.addTask(combatDamageTask, unsigned int(GO::TaskIdentifiers::CalculateFinished));
-
-				GO::Task entityDeathTask(unsigned int(GO::TaskIdentifiers::ApplyEntityDeaths), std::bind(&ApplyEntityDeaths, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-				scheduler.addTask(entityDeathTask, unsigned int(GO::TaskIdentifiers::ApplyCombatDamage));
-
-				GO::Task entitySpawnTask(unsigned int(GO::TaskIdentifiers::ApplyEntitySpawns), std::bind(&ApplyEntitySpawns, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-				scheduler.addTask(entitySpawnTask, unsigned int(GO::TaskIdentifiers::ApplyEntityDeaths));
-
+				AddSystemForUpdate(applyEntityDeathsSystem, scheduler, systemUpdateParams);
+				AddSystemForUpdate(applyEntitySpawnsSystem, scheduler, systemUpdateParams);
 				AddSystemForUpdate(movementSystem, scheduler, systemUpdateParams);
 			}
 

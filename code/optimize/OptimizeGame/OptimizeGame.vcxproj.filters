@@ -153,6 +153,12 @@
     <ClCompile Include="GO_ApplyCombatDamageSystem.cpp">
       <Filter>Entity Systems\Systems</Filter>
     </ClCompile>
+    <ClCompile Include="GO_ApplyEntityDeathsSystem.cpp">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_ApplyEntitySpawnsSystem.cpp">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StableHeaders.h">
@@ -270,6 +276,12 @@
       <Filter>Threading\Utilities</Filter>
     </ClInclude>
     <ClInclude Include="GO_ApplyCombatDamageSystem.h">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ApplyEntityDeathsSystem.h">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ApplyEntitySpawnsSystem.h">
       <Filter>Entity Systems\Systems</Filter>
     </ClInclude>
   </ItemGroup>

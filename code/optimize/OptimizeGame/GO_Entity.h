@@ -52,8 +52,6 @@ namespace GO
 		ComponentType* component = new ComponentType(*this);
 		myComponents.push_back(component);
 
-		GameInstance::GetInstance()->getTaskScheduler().registerComponent(component);
-
 		return component;
 	}
 

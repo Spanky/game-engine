@@ -169,6 +169,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="GO_ApplyCombatDamageSystem.cpp" />
+    <ClCompile Include="GO_ApplyEntityDeathsSystem.cpp" />
+    <ClCompile Include="GO_ApplyEntitySpawnsSystem.cpp" />
     <ClCompile Include="GO_AssertMutex.cpp" />
     <ClCompile Include="GO_CalculateCombatDamageSystem.cpp" />
     <ClCompile Include="GO_ComponentUpdater.cpp" />
@@ -204,6 +206,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GO_ApplyCombatDamageSystem.h" />
+    <ClInclude Include="GO_ApplyEntityDeathsSystem.h" />
+    <ClInclude Include="GO_ApplyEntitySpawnsSystem.h" />
     <ClInclude Include="GO_Assert.h" />
     <ClInclude Include="GO_AssertMutex.h" />
     <ClInclude Include="GO_CalculateCombatDamageSystem.h" />
