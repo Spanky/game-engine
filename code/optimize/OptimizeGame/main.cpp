@@ -4,8 +4,10 @@
 #include "GO_TaskIdentifiers.h"
 #include "GO_MovementCalculationSystem.h"
 #include "GO_MovementApplySystem.h"
+#include "GO_CalculateCombatDamageSystem.h"
 
 #include "GO_EventBroker.h"
+#include "GO_ThreadUtils.h"
 
 #include "GO_AssertMutex.h"
 #include "GO_World.h"
@@ -237,215 +239,6 @@ void TestFrameProcessor()
 }
 
 
-template<typename Iterator, typename Callback, typename Type = typename std::iterator_traits<Iterator>::value_type>
-void RunParallel(Iterator anIterBegin, Iterator anIterEnd, GO::World &aWorld, GO::ThreadPool &aThreadPool, GO_APIProfiler &aProfiler, const unsigned char aThreadTag, Callback aCallback)
-{
-	if (anIterBegin == anIterEnd)
-	{
-		return;
-	}
-
-	// TODO(scarroll): Get the number of tasks available from the thread pool
-	const unsigned int threadCount = std::thread::hardware_concurrency();
-
-	size_t numElements = anIterEnd - anIterBegin;
-
-	// We have at least one job for every thread. Otherwise we'll just do the processing ourselves
-	if (numElements >= threadCount)
-	{
-		const size_t NumJobsPerThread = (numElements + threadCount - 1) / threadCount;
-
-		std::atomic_size_t counter = 0;
-		{
-			std::vector<std::future<int>> futures(threadCount - 1);
-
-			// Run the parallel batches
-			for (size_t i = 0; i < threadCount - 1; ++i)
-			{
-				const size_t startIndex = i * NumJobsPerThread;
-				const size_t endIndex = (i + 1) * NumJobsPerThread;
-
-				std::future<int> result = aThreadPool.Submit([&counter, &aProfiler, startIndex, endIndex, anIterBegin, aThreadTag, aCallback, i, threadCount]() -> int
-				{
-					PROFILER_SCOPED(&aProfiler, "Run Parallel", 0x00A2E8FF);
-					// TODO: The thread tag should be automatically gathered from the same tag as the 'submit' event
-					aProfiler.PushThreadEvent(aThreadTag);
-					aCallback(anIterBegin.operator->(), startIndex, endIndex, i, threadCount, aProfiler);
-
-					const size_t numProcessed = endIndex - startIndex;
-
-					// TODO(scarroll): Remove the counter for batch processing once the system is complete
-					return int(counter.fetch_add(numProcessed));
-				});
-
-				futures[i] = std::move(result);
-			}
-
-
-			// Run the local batch
-			{
-				const size_t startIndex = (threadCount - 1) * NumJobsPerThread;
-				const size_t numProcessed = numElements - startIndex;
-				aCallback(anIterBegin.operator->(), startIndex, numElements, threadCount - 1, threadCount, aProfiler);
-				counter.fetch_add(numProcessed);
-			}
-
-			std::for_each(futures.begin(), futures.end(), [](std::future<int>& aFuture)
-			{
-				aFuture.get();
-			});
-		}
-
-
-		size_t resultCounter = counter.load();
-		GO_ASSERT(resultCounter == numElements, "Number of jobs processed was not the same as the number of jobs submitted");
-	}
-	else
-	{
-		// Run everything locally since it's a small batch anyways
-		aCallback(anIterBegin.operator->(), 0, numElements, 0, 1, aProfiler);
-	}
-}
-
-
-float DistanceBetweenEntities(const GO::Entity* aLHS, const GO::Entity* aRHS)
-{
-	const sf::Vector2i& lhsPosition = aLHS->getPosition();
-	const sf::Vector2i& rhsPosition = aRHS->getPosition();
-
-	return std::sqrt(((lhsPosition.x - rhsPosition.x) * (lhsPosition.x - rhsPosition.x))
-		+ ((lhsPosition.y - rhsPosition.y) * (lhsPosition.y - rhsPosition.y)));
-}
-
-namespace GO
-{
-	class CalculateCombatDamageSystem : public GameUpdateSystem
-	{
-	public:
-		virtual void updateSystem(SystemUpdateParams& someUpdateParams) override
-		{
-			GO::World& world = someUpdateParams.myWorld;
-			GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
-			GO_APIProfiler& profiler = someUpdateParams.myProfiler;
-
-			PROFILER_SCOPED(&profiler, "CalculateCombatDamageSystem", 0xff5500ff);
-
-			GO::World::EntityList& entityList = world.getEntities();
-			const size_t entityListSize = entityList.size();
-
-			RunParallel(entityList.begin(), entityList.end(), world, threadPool, profiler, GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK,
-				[&](GO::Entity** someEntities, const size_t aStartIndex, const size_t anEndIndex, const size_t aTaskIndex, const unsigned int aTotalTaskCount, GO_APIProfiler& aProfiler)
-			{
-				PROFILER_SCOPED(&profiler, "CalculateCombatDamageSystem_Threaded", 0x992200ff);
-				const GO::World::EntityList& entityList = world.getEntities();
-				const size_t entityListSize = entityList.size();
-
-				std::vector<CombatDamageMessage> damageMessages;
-
-				const size_t numTotalIterations = (entityListSize * (entityListSize - 1)) / 2;
-				const size_t numIterationsPerTask = (numTotalIterations + aTotalTaskCount - 1) / aTotalTaskCount;
-
-				// An over estimated iterations required by this task has now been calculated. The cut off
-				// iteration count will be based on full passes of the inner loop. That is, the inner loop
-				// will never do partial iterations. At most, a task will perform one full inner iteration
-				// more than a perfectly balanced system
-
-				// We need to loop over all the previous task indices and figure out how many tasks they will
-				// be taking. We can then start ours based on this.
-				// TODO(scarroll): This can be solved by subtracting the summation of values before our desired
-				//					n and solving.
-
-				// https://stackoverflow.com/questions/362059/what-is-the-big-o-of-a-nested-loop-where-number-of-iterations-in-the-inner-loop/362092#362092
-				// Calculate n such that summation equals numIterationsPerTask
-				// sum = n(n+1) / 2
-				// sum * 2 = n * (n+1)
-				// sum * 2 = n^2 + n
-				// sum * 2 = n^2 + n + (1/2)^2 - (1/2)^2
-				// sum * 2 = (n + 0.5)^2 - (0.5)^2
-				// sum * 2 + 0.25 = (n + 0.5)^2
-				// sqrt(sum * 2 + 0.25) = n + 0.5
-				// sqrt(sum * 2 + 0.25) - 0.5 = n
-
-				std::vector<size_t> taskSumCounts(aTotalTaskCount);
-
-				using indexPair = std::pair<size_t, size_t>;
-
-				std::vector<indexPair> taskIndices(aTotalTaskCount);
-				for(unsigned int i = 0; i < aTotalTaskCount; i++)
-				{
-					size_t sumRequired = (i > 0) ? (taskSumCounts[i - 1] + numIterationsPerTask) : numIterationsPerTask;
-					taskSumCounts[i] = sumRequired;
-
-					indexPair indices;
-					indices.first = (i > 0) ? taskIndices[i - 1].second : 0;
-					indices.second = std::round(sqrt(sumRequired * 2 + 0.25) - 0.5);
-
-					taskIndices[i] = indices;
-				}
-
-				for(unsigned int i = 0; i < aTotalTaskCount; i++)
-				{
-					indexPair& indices = taskIndices[i];
-
-					std::swap(indices.first, indices.second);
-					indices.first = entityListSize - indices.first - 1;
-					indices.second = entityListSize - indices.second - 1;
-				}
-
-				for(size_t outerIndex = taskIndices[aTaskIndex].first; outerIndex < taskIndices[aTaskIndex].second; outerIndex++)
-				{
-					GO::Entity* outerEntity = someEntities[outerIndex];
-					GO_ASSERT(outerEntity, "Entity list contains a nullptr");
-
-					for (size_t innerIndex = outerIndex + 1; innerIndex < entityListSize; innerIndex++)
-					{
-						GO::Entity* innerEntity = entityList[innerIndex];
-						GO_ASSERT(innerEntity, "Entity list contains a nullptr");
-
-						const float distance = DistanceBetweenEntities(outerEntity, innerEntity);
-						if (distance < 100.0f)
-						{
-							{
-								CombatDamageMessage msg;
-								msg.myDealerEntity = outerEntity;
-								msg.myReceiverEntity = innerEntity;
-								msg.myDamageDealt = 1.0f;
-								damageMessages.push_back(msg);
-							}
-
-							{
-								CombatDamageMessage msg;
-								msg.myDealerEntity = innerEntity;
-								msg.myReceiverEntity = outerEntity;
-								msg.myDamageDealt = 1.0f;
-								damageMessages.push_back(msg);
-							}
-						}
-					}
-				}
-
-				// TODO(scarroll): Perform the gather in parallel with other tasks
-				GO::EventBroker::QueueDamage(damageMessages, profiler);
-			});
-		}
-	};
-
-
-	template<>
-	struct GameUpdateSystemTypeTraits<CalculateCombatDamageSystem>
-	{
-		static constexpr TaskIdentifiers ourTaskIdentifier = TaskIdentifiers::CalculateCombat;
-		typedef GameUpdateSystemNoDependencies ourTaskDependencies;
-	};
-
-	template<>
-	struct ProfilerTypeTraits<CalculateCombatDamageSystem>
-	{
-		static const unsigned char ourProfilerTag = GO_ProfilerTags::THREAD_TAG_CALC_GAME_TASK;
-	};
-}
-
-
 void ApplyCombatDamageInternal(const GO::CombatDamageMessage* someCombatMessages, const size_t aStartIndex, const size_t anEndIndex, const size_t aTaskIndex, const unsigned int aTotalTaskCount, GO_APIProfiler& aProfiler)
 {
 	PROFILER_SCOPED(&aProfiler, "ApplyCombatDamageInternal", 0x6B0BBFFF);
@@ -476,7 +269,7 @@ void ApplyCombatDamage(const GO::SystemUpdateParams& someUpdateParams)
 	GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
 	GO_APIProfiler& profiler = someUpdateParams.myProfiler;
 
-	RunParallel(GO::EventBroker::GetCombatMessages().begin(), GO::EventBroker::GetCombatMessages().end(), world, threadPool, profiler, GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK, &ApplyCombatDamageInternal);
+	GO::ThreadUtils::RunParallel(GO::EventBroker::GetCombatMessages().begin(), GO::EventBroker::GetCombatMessages().end(), world, threadPool, profiler, GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK, &ApplyCombatDamageInternal);
 
 	GO::EventBroker::ClearCombatMessages();
 }

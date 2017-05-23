@@ -169,6 +169,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="GO_AssertMutex.cpp" />
+    <ClCompile Include="GO_CalculateCombatDamageSystem.cpp" />
     <ClCompile Include="GO_ComponentUpdater.cpp" />
     <ClCompile Include="GO_Entity.cpp" />
     <ClCompile Include="GO_EntityComponent.cpp" />
@@ -203,6 +204,7 @@
   <ItemGroup>
     <ClInclude Include="GO_Assert.h" />
     <ClInclude Include="GO_AssertMutex.h" />
+    <ClInclude Include="GO_CalculateCombatDamageSystem.h" />
     <ClInclude Include="GO_ComponentUpdater.h" />
     <ClInclude Include="GO_Entity.h" />
     <ClInclude Include="GO_EntityComponent.h" />
@@ -233,6 +235,7 @@
     <ClInclude Include="GO_ThreadJoiner.h" />
     <ClInclude Include="GO_ThreadPool.h" />
     <ClInclude Include="GO_ThreadSafeQueue.h" />
+    <ClInclude Include="GO_ThreadUtils.h" />
     <ClInclude Include="GO_UniformThreadGroup.h" />
     <ClInclude Include="GO_World.h" />
     <ClInclude Include="main.h" />

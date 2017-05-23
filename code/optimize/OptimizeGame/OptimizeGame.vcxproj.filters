@@ -67,6 +67,9 @@
     <Filter Include="Threading\Task System">
       <UniqueIdentifier>{4fd1ee46-b595-446a-9178-4bf160d57e72}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Threading\Utilities">
+      <UniqueIdentifier>{7b8c4741-ac45-4b9e-8c94-5856a2ca2eb5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -143,6 +146,9 @@
     </ClCompile>
     <ClCompile Include="GO_EventBroker.cpp">
       <Filter>World</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_CalculateCombatDamageSystem.cpp">
+      <Filter>Entity Systems\Systems</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -253,6 +259,12 @@
     </ClInclude>
     <ClInclude Include="GO_EventBroker.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_CalculateCombatDamageSystem.h">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ThreadUtils.h">
+      <Filter>Threading\Utilities</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
