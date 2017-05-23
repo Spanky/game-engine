@@ -5,6 +5,8 @@
 #include "GO_MovementCalculationSystem.h"
 #include "GO_MovementApplySystem.h"
 
+#include "GO_EventBroker.h"
+
 #include "GO_AssertMutex.h"
 #include "GO_World.h"
 #include "GO_TaskScheduler.h"
@@ -69,10 +71,6 @@ void AddSystemForUpdate(T& aSystemToUpdate, GO::TaskSchedulerNew& aTaskScheduler
 		GO_ASSERT(false, "Too many dependencies for current implementation");
 	}
 }
-
-
-
-GO::AssertMutex ourCombatDamageMutex;
 
 
 static_assert(sizeof(sf::Time) == sizeof(size_t), "Time is bigger than a native type and should be passed by reference");
@@ -310,31 +308,6 @@ void RunParallel(Iterator anIterBegin, Iterator anIterEnd, GO::World &aWorld, GO
 }
 
 
-struct CombatDamageMessage
-{
-	GO::Entity* myDealerEntity;
-	GO::Entity* myReceiverEntity;
-	float myDamageDealt;
-};
-
-struct EntityDeathMessage
-{
-	// TODO: Replace these with handles eventually to avoid the constant lookups all the time
-	size_t myDeadEntityId;
-	size_t myKillerEntityId;
-};
-
-struct EntitySpawnMessage
-{
-};
-
-
-std::vector<CombatDamageMessage> ourCombatDamageMessages;
-std::vector<EntityDeathMessage> ourEntityDeathMessages;
-std::vector<EntitySpawnMessage> ourEntitySpawnMessages;
-
-
-
 float DistanceBetweenEntities(const GO::Entity* aLHS, const GO::Entity* aRHS)
 {
 	const sf::Vector2i& lhsPosition = aLHS->getPosition();
@@ -344,46 +317,6 @@ float DistanceBetweenEntities(const GO::Entity* aLHS, const GO::Entity* aRHS)
 		+ ((lhsPosition.y - rhsPosition.y) * (lhsPosition.y - rhsPosition.y)));
 }
 
-namespace GameEvents
-{
-	std::mutex ourDamageQueueMutex;
-
-	void QueueDamage(GO::Entity* aDealer, GO::Entity* aReceiver, const float aDamageDone)
-	{
-		std::lock_guard<std::mutex> lock(ourDamageQueueMutex);
-
-		CombatDamageMessage msg;
-		msg.myDealerEntity = aDealer;
-		msg.myReceiverEntity = aReceiver;
-		msg.myDamageDealt = aDamageDone;
-
-		ourCombatDamageMessages.push_back(msg);
-	}
-
-	void QueueDamage(const std::vector<CombatDamageMessage>& someDamageMessages, GO_APIProfiler& aProfiler)
-	{
-		PROFILER_SCOPED(&aProfiler, "QueueDamage", 0xd986e8ff);
-		std::lock_guard<std::mutex> lock(ourDamageQueueMutex);
-		ourCombatDamageMessages.insert(ourCombatDamageMessages.end(), someDamageMessages.begin(), someDamageMessages.end());
-	}
-
-	void QueueEntityForDeath(const GO::Entity* aDeadEntity, const GO::Entity* aKillerEntity)
-	{
-		EntityDeathMessage msg;
-		msg.myDeadEntityId = aDeadEntity->getId();
-		msg.myKillerEntityId = aKillerEntity->getId();
-
-		ourEntityDeathMessages.push_back(msg);
-	}
-
-	void QueueEntityForSpawn()
-	{
-		EntitySpawnMessage msg;
-
-		ourEntitySpawnMessages.push_back(msg);
-	}
-}
-
 namespace GO
 {
 	class CalculateCombatDamageSystem : public GameUpdateSystem
@@ -391,7 +324,6 @@ namespace GO
 	public:
 		virtual void updateSystem(SystemUpdateParams& someUpdateParams) override
 		{
-			GO::AssertMutexLock lock(ourCombatDamageMutex);
 			GO::World& world = someUpdateParams.myWorld;
 			GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
 			GO_APIProfiler& profiler = someUpdateParams.myProfiler;
@@ -493,7 +425,7 @@ namespace GO
 				}
 
 				// TODO(scarroll): Perform the gather in parallel with other tasks
-				GameEvents::QueueDamage(damageMessages, profiler);
+				GO::EventBroker::QueueDamage(damageMessages, profiler);
 			});
 		}
 	};
@@ -514,12 +446,12 @@ namespace GO
 }
 
 
-void ApplyCombatDamageInternal(const CombatDamageMessage* someCombatMessages, const size_t aStartIndex, const size_t anEndIndex, const size_t aTaskIndex, const unsigned int aTotalTaskCount, GO_APIProfiler& aProfiler)
+void ApplyCombatDamageInternal(const GO::CombatDamageMessage* someCombatMessages, const size_t aStartIndex, const size_t anEndIndex, const size_t aTaskIndex, const unsigned int aTotalTaskCount, GO_APIProfiler& aProfiler)
 {
 	PROFILER_SCOPED(&aProfiler, "ApplyCombatDamageInternal", 0x6B0BBFFF);
 	for (size_t currentIndex = aStartIndex; currentIndex < anEndIndex; currentIndex++)
 	{
-		const CombatDamageMessage& damageMsg = (someCombatMessages[currentIndex]);
+		const GO::CombatDamageMessage& damageMsg = (someCombatMessages[currentIndex]);
 
 		GO::Entity* dealerEntity = damageMsg.myDealerEntity;
 		GO::Entity* receiverEntity = damageMsg.myReceiverEntity;
@@ -532,7 +464,7 @@ void ApplyCombatDamageInternal(const CombatDamageMessage* someCombatMessages, co
 		//receiverHealthComp->myHealth -= damageMsg.myDamageDealt;
 		//if(receiverHealthComp->myHealth <= 0.0f)
 		//{
-		//	GameEvents::QueueEntityForDeath(receiverEntity, dealerEntity);
+		//	GO::EventBroker::QueueEntityForDeath(receiverEntity, dealerEntity);
 		//}
 	}
 }
@@ -540,14 +472,13 @@ void ApplyCombatDamageInternal(const CombatDamageMessage* someCombatMessages, co
 void ApplyCombatDamage(const GO::SystemUpdateParams& someUpdateParams)
 {
 	PROFILER_SCOPED(&someUpdateParams.myProfiler, "ApplyCombatDamage", 0x8931D6FF);
-	GO::AssertMutexLock lock(ourCombatDamageMutex);
 	GO::World& world = someUpdateParams.myWorld;
 	GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
 	GO_APIProfiler& profiler = someUpdateParams.myProfiler;
 
-	RunParallel(ourCombatDamageMessages.begin(), ourCombatDamageMessages.end(), world, threadPool, profiler, GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK, &ApplyCombatDamageInternal);
+	RunParallel(GO::EventBroker::GetCombatMessages().begin(), GO::EventBroker::GetCombatMessages().end(), world, threadPool, profiler, GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK, &ApplyCombatDamageInternal);
 
-	ourCombatDamageMessages.clear();
+	GO::EventBroker::ClearCombatMessages();
 }
 
 void ApplyEntityDeaths(const GO::SystemUpdateParams& someUpdateParams)
@@ -556,7 +487,7 @@ void ApplyEntityDeaths(const GO::SystemUpdateParams& someUpdateParams)
 	GO::World& world = someUpdateParams.myWorld;
 	const GO::World::EntityList& entityList = world.getEntities();
 
-	for(const EntityDeathMessage& deathMsg : ourEntityDeathMessages)
+	for(const GO::EntityDeathMessage& deathMsg : GO::EventBroker::GetDeathMessages())
 	{
 		const size_t deadEntityId = deathMsg.myDeadEntityId;
 		
@@ -574,14 +505,14 @@ void ApplyEntityDeaths(const GO::SystemUpdateParams& someUpdateParams)
 		}
 	}
 
-	ourEntityDeathMessages.clear();
+	GO::EventBroker::ClearDeathMessages();
 }
 
 void ApplyEntitySpawns(const GO::SystemUpdateParams& someUpdateParams)
 {
 	GO::World& world = someUpdateParams.myWorld;
 
-	for(const EntitySpawnMessage& spawnMsg : ourEntitySpawnMessages)
+	for(const GO::EntitySpawnMessage& spawnMsg : GO::EventBroker::GetSpawnMessages())
 	{
 		GO::Entity* entity = world.createEntity();
 		entity->createComponent<GO::SpriteComponent>();
@@ -589,7 +520,7 @@ void ApplyEntitySpawns(const GO::SystemUpdateParams& someUpdateParams)
 		entity->createComponent<GO::HealthComponent>();
 	}
 
-	ourEntitySpawnMessages.clear();
+	GO::EventBroker::ClearSpawnMessages();
 }
 
 

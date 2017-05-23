@@ -172,6 +172,7 @@
     <ClCompile Include="GO_ComponentUpdater.cpp" />
     <ClCompile Include="GO_Entity.cpp" />
     <ClCompile Include="GO_EntityComponent.cpp" />
+    <ClCompile Include="GO_EventBroker.cpp" />
     <ClCompile Include="GO_GameInstance.cpp" />
     <ClCompile Include="GO_GameStateChange.cpp" />
     <ClCompile Include="GO_HacksGlobalResources.cpp" />
@@ -205,6 +206,7 @@
     <ClInclude Include="GO_ComponentUpdater.h" />
     <ClInclude Include="GO_Entity.h" />
     <ClInclude Include="GO_EntityComponent.h" />
+    <ClInclude Include="GO_EventBroker.h" />
     <ClInclude Include="GO_GameInstance.h" />
     <ClInclude Include="GO_GameStateChange.h" />
     <ClInclude Include="GO_GameUpdateSystem.h" />

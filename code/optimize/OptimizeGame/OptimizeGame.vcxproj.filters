@@ -141,6 +141,9 @@
     <ClCompile Include="GO_TaskSchedulerNew.cpp">
       <Filter>Threading\Task System</Filter>
     </ClCompile>
+    <ClCompile Include="GO_EventBroker.cpp">
+      <Filter>World</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StableHeaders.h">
@@ -247,6 +250,9 @@
     </ClInclude>
     <ClInclude Include="GO_TaskIdentifiers.h">
       <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_EventBroker.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
