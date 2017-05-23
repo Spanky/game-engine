@@ -150,6 +150,9 @@
     <ClCompile Include="GO_CalculateCombatDamageSystem.cpp">
       <Filter>Entity Systems\Systems</Filter>
     </ClCompile>
+    <ClCompile Include="GO_ApplyCombatDamageSystem.cpp">
+      <Filter>Entity Systems\Systems</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StableHeaders.h">
@@ -265,6 +268,9 @@
     </ClInclude>
     <ClInclude Include="GO_ThreadUtils.h">
       <Filter>Threading\Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ApplyCombatDamageSystem.h">
+      <Filter>Entity Systems\Systems</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

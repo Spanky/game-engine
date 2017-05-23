@@ -5,6 +5,7 @@
 #include "GO_MovementCalculationSystem.h"
 #include "GO_MovementApplySystem.h"
 #include "GO_CalculateCombatDamageSystem.h"
+#include "GO_ApplyCombatDamageSystem.h"
 
 #include "GO_EventBroker.h"
 #include "GO_ThreadUtils.h"
@@ -238,42 +239,6 @@ void TestFrameProcessor()
 	frameProcessors = nullptr;
 }
 
-
-void ApplyCombatDamageInternal(const GO::CombatDamageMessage* someCombatMessages, const size_t aStartIndex, const size_t anEndIndex, const size_t aTaskIndex, const unsigned int aTotalTaskCount, GO_APIProfiler& aProfiler)
-{
-	PROFILER_SCOPED(&aProfiler, "ApplyCombatDamageInternal", 0x6B0BBFFF);
-	for (size_t currentIndex = aStartIndex; currentIndex < anEndIndex; currentIndex++)
-	{
-		const GO::CombatDamageMessage& damageMsg = (someCombatMessages[currentIndex]);
-
-		GO::Entity* dealerEntity = damageMsg.myDealerEntity;
-		GO::Entity* receiverEntity = damageMsg.myReceiverEntity;
-
-		GO::HealthComponent* dealerHealthComp = dealerEntity->getComponent<GO::HealthComponent>();
-		GO::HealthComponent* receiverHealthComp = receiverEntity->getComponent<GO::HealthComponent>();
-
-		GO_ASSERT(receiverHealthComp, "Receiver that took damage doesn't have a health component");
-
-		//receiverHealthComp->myHealth -= damageMsg.myDamageDealt;
-		//if(receiverHealthComp->myHealth <= 0.0f)
-		//{
-		//	GO::EventBroker::QueueEntityForDeath(receiverEntity, dealerEntity);
-		//}
-	}
-}
-
-void ApplyCombatDamage(const GO::SystemUpdateParams& someUpdateParams)
-{
-	PROFILER_SCOPED(&someUpdateParams.myProfiler, "ApplyCombatDamage", 0x8931D6FF);
-	GO::World& world = someUpdateParams.myWorld;
-	GO::ThreadPool& threadPool = someUpdateParams.myThreadPool;
-	GO_APIProfiler& profiler = someUpdateParams.myProfiler;
-
-	GO::ThreadUtils::RunParallel(GO::EventBroker::GetCombatMessages().begin(), GO::EventBroker::GetCombatMessages().end(), world, threadPool, profiler, GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK, &ApplyCombatDamageInternal);
-
-	GO::EventBroker::ClearCombatMessages();
-}
-
 void ApplyEntityDeaths(const GO::SystemUpdateParams& someUpdateParams)
 {
 	PROFILER_SCOPED(&someUpdateParams.myProfiler, "ApplyEntityDeaths", 0xFFFFFFFF);
@@ -454,7 +419,9 @@ void RunGame()
 	GO::CalculateCombatDamageSystem calcCombatDamageSystem;
 	GO::MovementCalculationSystem calcEntityMovementSystem(world);
 	GO::MovementApplySystem movementSystem(world);
+	GO::ApplyCombatDamageSystem applyCombatDamageSystem;
 
+	window.setVerticalSyncEnabled(true);
 
 	while(window.isOpen())
 	{
@@ -501,8 +468,9 @@ void RunGame()
 			{
 				PROFILER_SCOPED(&testProfiler, "Apply Game Step", 0x00ff00ff);
 
-				GO::Task combatDamageTask(unsigned int(GO::TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
-				scheduler.addTask(combatDamageTask, unsigned int(GO::TaskIdentifiers::CalculateFinished));
+				AddSystemForUpdate(applyCombatDamageSystem, scheduler, systemUpdateParams);
+				//GO::Task combatDamageTask(unsigned int(GO::TaskIdentifiers::ApplyCombatDamage), std::bind(&ApplyCombatDamage, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
+				//scheduler.addTask(combatDamageTask, unsigned int(GO::TaskIdentifiers::CalculateFinished));
 
 				GO::Task entityDeathTask(unsigned int(GO::TaskIdentifiers::ApplyEntityDeaths), std::bind(&ApplyEntityDeaths, systemUpdateParams), GO_ProfilerTags::THREAD_TAG_APPLY_GAME_TASK);
 				scheduler.addTask(entityDeathTask, unsigned int(GO::TaskIdentifiers::ApplyCombatDamage));
