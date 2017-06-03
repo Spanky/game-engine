@@ -15,7 +15,7 @@ namespace GO
 	{
 		PROFILER_SCOPED(&aProfiler, "ApplyCombatDamageInternal", 0x6B0BBFFF);
 
-		//ComponentAccessFlagsType accessFlags = ComponentAccessControl::requestGeneralAccess(ReadComponentList<>(), WriteComponentList<HealthComponent>());
+		//ScopedComponentAccessFlags scopedAccessFlags = ScopedComponentAccessFlags(ReadComponentList<>(), WriteComponentList<HealthComponent>());
 
 		for (size_t currentIndex = aStartIndex; currentIndex < anEndIndex; currentIndex++)
 		{
@@ -24,8 +24,8 @@ namespace GO
 			Entity* dealerEntity = damageMsg.myDealerEntity;
 			Entity* receiverEntity = damageMsg.myReceiverEntity;
 
-			//HealthComponent* dealerHealthComp = dealerEntity->getComponentWriteAccess<HealthComponent>(accessFlags);
-			//HealthComponent* receiverHealthComp = receiverEntity->getComponentWriteAccess<HealthComponent>(accessFlags);
+			//HealthComponent* dealerHealthComp = dealerEntity->getComponentWriteAccess<HealthComponent>(scopedAccessFlags.getRights());
+			//HealthComponent* receiverHealthComp = receiverEntity->getComponentWriteAccess<HealthComponent>(scopedAccessFlags.getRights());
 
 			//GO_ASSERT(receiverHealthComp, "Receiver that took damage doesn't have a health component");
 
@@ -35,8 +35,6 @@ namespace GO
 			//	EventBroker::QueueEntityForDeath(receiverEntity, dealerEntity);
 			//}
 		}
-
-		//ComponentAccessControl::releaseAccess(accessFlags);
 	}
 
 	void ApplyCombatDamageSystem::updateSystem(SystemUpdateParams& someUpdateParams)

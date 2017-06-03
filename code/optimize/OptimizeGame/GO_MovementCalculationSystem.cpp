@@ -28,7 +28,7 @@ namespace GO
 
 	void MovementCalculationSystem::RandomlyMoveEnemies()
 	{
-		auto accessFlags = ComponentAccessControl::requestAccess(ReadComponentList<RandomMovementComponent, MovementComponent>(), WriteComponentList<>());
+		ScopedComponentAccessFlags scopedComponentAccess = ScopedComponentAccessFlags(ReadComponentList<RandomMovementComponent, MovementComponent>(), WriteComponentList<>());
 
 		const World::EntityList& entityList = myWorld.getEntities();
 		const size_t entityListSize = entityList.size();
@@ -48,9 +48,9 @@ namespace GO
 			Entity* outerEntity = entityList[outerIndex];
 			GO_ASSERT(outerEntity, "Entity list contains a nullptr");
 
-			if (const RandomMovementComponent* randomMovement = outerEntity->getComponentReadAccess<RandomMovementComponent>(accessFlags))
+			if (const RandomMovementComponent* randomMovement = outerEntity->getComponentReadAccess<RandomMovementComponent>(scopedComponentAccess.getRights()))
 			{
-				const MovementComponent* movementComponent = outerEntity->getComponentReadAccess<MovementComponent>(accessFlags);
+				const MovementComponent* movementComponent = outerEntity->getComponentReadAccess<MovementComponent>(scopedComponentAccess.getRights());
 				GO_ASSERT(movementComponent, "A randomly moving entity requires a movement component to perform the movement");
 
 				if (!movementComponent->myHasMovementQueued)
@@ -83,8 +83,6 @@ namespace GO
 				}
 			}
 		}
-
-		ComponentAccessControl::releaseAccess(accessFlags);
 	}
 
 	void MovementCalculationSystem::GeneratePlayerMovementBasedOnInput()
@@ -92,7 +90,7 @@ namespace GO
 		const World::EntityList& entityList = myWorld.getEntities();
 		GO_ASSERT(entityList.size() > 0, "No entities in the world to update");
 
-		ComponentAccessFlagsType accessFlags = ComponentAccessControl::requestAccess(ReadComponentList<MovementComponent, PlayerInputComponent>(), WriteComponentList<>());
+		ScopedComponentAccessFlags scopedAccessFlags = ScopedComponentAccessFlags(ReadComponentList<MovementComponent, PlayerInputComponent>(), WriteComponentList<>());
 
 		//if (playerInputComponent->wasKeyPressedThisFrame(sf::Keyboard::Space))
 		//{
@@ -101,8 +99,8 @@ namespace GO
 
 		// TODO: An assumption is made that the player is the first entity in the list
 		Entity* playerEntity = entityList[0];
-		const MovementComponent* movementComponent = playerEntity->getComponentReadAccess<MovementComponent>(accessFlags);
-		const PlayerInputComponent* playerInputComponent = playerEntity->getComponentReadAccess<PlayerInputComponent>(accessFlags);
+		const MovementComponent* movementComponent = playerEntity->getComponentReadAccess<MovementComponent>(scopedAccessFlags.getRights());
+		const PlayerInputComponent* playerInputComponent = playerEntity->getComponentReadAccess<PlayerInputComponent>(scopedAccessFlags.getRights());
 		
 
 		if(!movementComponent->myHasMovementQueued)
@@ -132,7 +130,5 @@ namespace GO
 				GameStateChange::QueueMovement(playerEntity, desiredTile);
 			}
 		}
-
-		ComponentAccessControl::releaseAccess(accessFlags);
 	}
 }

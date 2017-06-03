@@ -19,6 +19,8 @@ namespace GO
 
 	void SpriteComponent::render(sf::RenderWindow& aRenderWindow)
 	{
+		// TODO(scarroll): Split the sprite render into two methods. One to update the position of each sprite which
+		//					can be run in parallel and one to do the rendering which should happen on the render thread
 		sf::Vector2f spritePosition(getEntity().getPosition().x, getEntity().getPosition().y);
 		mySprite.setPosition(spritePosition);
 

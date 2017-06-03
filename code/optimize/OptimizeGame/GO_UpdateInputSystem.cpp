@@ -12,7 +12,7 @@ namespace GO
 	void UpdateInputSystem::updateSystem(SystemUpdateParams& someUpdateParams)
 	{
 		PROFILER_SCOPED(&someUpdateParams.myProfiler, "UpdateInputSystem", 0xf2ebd2FF);
-		ComponentAccessFlagsType accessFlags = ComponentAccessControl::requestAccess(ReadComponentList<>(), WriteComponentList<PlayerInputComponent>());
+		ScopedComponentAccessFlags scopedAccessFlags = ScopedComponentAccessFlags(ReadComponentList<>(), WriteComponentList<PlayerInputComponent>());
 		
 		World& world = someUpdateParams.myWorld;
 		ThreadPool& threadPool = someUpdateParams.myThreadPool;
@@ -20,7 +20,7 @@ namespace GO
 
 		// TODO(scarroll): An assumption that the player is always entity 0
 		Entity* playerEntity = world.getEntities()[0];
-		PlayerInputComponent* playerInputComponent = playerEntity->getComponentWriteAccess<PlayerInputComponent>(accessFlags);
+		PlayerInputComponent* playerInputComponent = playerEntity->getComponentWriteAccess<PlayerInputComponent>(scopedAccessFlags.getRights());
 		GO_ASSERT(playerInputComponent, "Player does not have an input component");
 
 		auto& prevFrameStates = playerInputComponent->myKeyStatesPrevFrame;
@@ -33,7 +33,5 @@ namespace GO
 			prevFrameStates[currentKeyIndex] = thisFrameStates[currentKeyIndex];
 			thisFrameStates[currentKeyIndex] = sf::Keyboard::isKeyPressed(currentKey);
 		}
-
-		ComponentAccessControl::releaseAccess(accessFlags);
 	}
 }

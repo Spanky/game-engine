@@ -127,4 +127,30 @@ namespace GO
 		static std::mutex ourStorageMutex;
 		static std::vector<std::shared_ptr<ComponentAccessFlags>> ourOutstandingFlags;
 	};
+
+
+
+	class ScopedComponentAccessFlags
+	{
+	public:
+		template<typename...ReadComponentTypes, typename...WriteComponentTypes>
+		ScopedComponentAccessFlags(ReadComponentList<ReadComponentTypes...> aReadComponentList, WriteComponentList<WriteComponentTypes...> aWriteComponentList)
+		{
+			myAccessFlags = ComponentAccessControl::requestAccess(aReadComponentList, aWriteComponentList);
+		}
+
+		~ScopedComponentAccessFlags()
+		{
+			ComponentAccessControl::releaseAccess(myAccessFlags);
+			myAccessFlags = nullptr;
+		}
+
+		const ComponentAccessFlagsType& getRights() const
+		{
+			return myAccessFlags;
+		}
+
+	private:
+		ComponentAccessFlagsType myAccessFlags;
+	};
 }

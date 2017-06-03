@@ -473,18 +473,18 @@ void RunGame()
 				{
 					PROFILER_SCOPED(&testProfiler, "Render Sprites", 0x00ffffff);
 
-					GO::ComponentAccessFlagsType accessFlags = GO::ComponentAccessControl::requestAccess(GO::ReadComponentList<>(), GO::WriteComponentList<GO::SpriteComponent>());
+					GO::ScopedComponentAccessFlags scopedAccessFlags = GO::ScopedComponentAccessFlags(GO::ReadComponentList<>(), GO::WriteComponentList<GO::SpriteComponent>());
+
 					GO::World::EntityList& entityList = world.getEntities();
 					for (size_t i = 0; i < entityList.size(); i++)
 					{
 						GO::Entity& currentEntity = *entityList[i];
-						GO::SpriteComponent* spriteComponent = currentEntity.getComponentWriteAccess<GO::SpriteComponent>(accessFlags);
+						GO::SpriteComponent* spriteComponent = currentEntity.getComponentWriteAccess<GO::SpriteComponent>(scopedAccessFlags.getRights());
 						if (spriteComponent)
 						{
 							spriteComponent->render(window);
 						}
 					}
-					GO::ComponentAccessControl::releaseAccess(accessFlags);
 				}
 			}
 

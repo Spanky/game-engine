@@ -15,11 +15,11 @@ namespace GO
 		World& world = someUpdateParams.myWorld;
 		GO_APIProfiler& profiler = someUpdateParams.myProfiler;
 
-		auto accessFlags = ComponentAccessControl::requestAccess(ReadComponentList<PlayerInputComponent>(), WriteComponentList<>());
+		ScopedComponentAccessFlags scopedAccessFlags = ScopedComponentAccessFlags(ReadComponentList<PlayerInputComponent>(), WriteComponentList<>());
 
 		// TODO(scarroll): An assumption that the player is always entity 0
 		Entity* playerEntity = world.getEntities()[0];
-		const PlayerInputComponent* playerInputComponent = playerEntity->getComponentReadAccess<PlayerInputComponent>(accessFlags);
+		const PlayerInputComponent* playerInputComponent = playerEntity->getComponentReadAccess<PlayerInputComponent>(scopedAccessFlags.getRights());
 		GO_ASSERT(playerInputComponent, "Player does not have an input component");
 
 		if (someUpdateParams.myRenderWindow.hasFocus() && !playerInputComponent->myKeyStatesThisFrame[sf::Keyboard::LSystem])
@@ -42,7 +42,5 @@ namespace GO
 				profiler.ViewNextFrame();
 			}
 		}
-
-		ComponentAccessControl::releaseAccess(accessFlags);
 	}
 }
