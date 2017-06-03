@@ -1,6 +1,7 @@
 #include "StableHeaders.h"
 #include "GO_ApplyCombatDamageSystem.h"
 
+#include "GO_ComponentAccessControl.h"
 #include "GO_Profiler.h"
 #include "GO_EventBroker.h"
 
@@ -13,6 +14,9 @@ namespace GO
 	void ApplyCombatDamageInternal(const CombatDamageMessage* someCombatMessages, const size_t aStartIndex, const size_t anEndIndex, const size_t aTaskIndex, const unsigned int aTotalTaskCount, GO_APIProfiler& aProfiler)
 	{
 		PROFILER_SCOPED(&aProfiler, "ApplyCombatDamageInternal", 0x6B0BBFFF);
+
+		//ComponentAccessFlagsType accessFlags = ComponentAccessControl::requestGeneralAccess(ReadComponentList<>(), WriteComponentList<HealthComponent>());
+
 		for (size_t currentIndex = aStartIndex; currentIndex < anEndIndex; currentIndex++)
 		{
 			const CombatDamageMessage& damageMsg = (someCombatMessages[currentIndex]);
@@ -20,10 +24,10 @@ namespace GO
 			Entity* dealerEntity = damageMsg.myDealerEntity;
 			Entity* receiverEntity = damageMsg.myReceiverEntity;
 
-			HealthComponent* dealerHealthComp = dealerEntity->getComponent<HealthComponent>();
-			HealthComponent* receiverHealthComp = receiverEntity->getComponent<HealthComponent>();
+			//HealthComponent* dealerHealthComp = dealerEntity->getComponentWriteAccess<HealthComponent>(accessFlags);
+			//HealthComponent* receiverHealthComp = receiverEntity->getComponentWriteAccess<HealthComponent>(accessFlags);
 
-			GO_ASSERT(receiverHealthComp, "Receiver that took damage doesn't have a health component");
+			//GO_ASSERT(receiverHealthComp, "Receiver that took damage doesn't have a health component");
 
 			//receiverHealthComp->myHealth -= damageMsg.myDamageDealt;
 			//if(receiverHealthComp->myHealth <= 0.0f)
@@ -31,6 +35,8 @@ namespace GO
 			//	EventBroker::QueueEntityForDeath(receiverEntity, dealerEntity);
 			//}
 		}
+
+		//ComponentAccessControl::releaseAccess(accessFlags);
 	}
 
 	void ApplyCombatDamageSystem::updateSystem(SystemUpdateParams& someUpdateParams)

@@ -67,6 +67,9 @@
     <Filter Include="Threading\Utilities">
       <UniqueIdentifier>{7b8c4741-ac45-4b9e-8c94-5856a2ca2eb5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Entity Systems\Threading">
+      <UniqueIdentifier>{63a0e863-22ed-4cde-8fa6-90c0044a6eec}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -155,6 +158,9 @@
     </ClCompile>
     <ClCompile Include="GO_DebugInputSystem.cpp">
       <Filter>Entity Systems\Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_ComponentAccessControl.cpp">
+      <Filter>Entity Systems\Threading</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -283,6 +289,15 @@
     </ClInclude>
     <ClInclude Include="GO_DebugInputSystem.h">
       <Filter>Entity Systems\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ComponentAccessFlags.h">
+      <Filter>Entity Systems\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ComponentAccessControl.h">
+      <Filter>Entity Systems\Threading</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_ComponentTypes.h">
+      <Filter>Entity Systems</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

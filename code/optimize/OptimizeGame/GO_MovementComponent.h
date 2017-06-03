@@ -1,12 +1,15 @@
 #pragma once
 
 #include "GO_EntityComponent.h"
+#include "GO_ComponentTypes.h"
 
 namespace GO
 {
 	class MovementComponent : public EntityComponent
 	{
 	public:
+		static ComponentType getComponentTypeStatic() { return ComponentType::MovementComponent; }
+
 		MovementComponent(Entity& anEntity)
 			: EntityComponent(anEntity)
 			, myCurrentTileIndex(0, 0)

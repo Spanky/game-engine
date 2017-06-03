@@ -5,12 +5,14 @@
 #include "GO_World.h"
 #include "GO_Entity.h"
 #include "GO_PlayerInputComponent.h"
+#include "GO_ComponentAccessControl.h"
 
 namespace GO
 {
 	void UpdateInputSystem::updateSystem(SystemUpdateParams& someUpdateParams)
 	{
 		PROFILER_SCOPED(&someUpdateParams.myProfiler, "UpdateInputSystem", 0xf2ebd2FF);
+		ComponentAccessFlagsType accessFlags = ComponentAccessControl::requestAccess(ReadComponentList<>(), WriteComponentList<PlayerInputComponent>());
 		
 		World& world = someUpdateParams.myWorld;
 		ThreadPool& threadPool = someUpdateParams.myThreadPool;
@@ -18,7 +20,7 @@ namespace GO
 
 		// TODO(scarroll): An assumption that the player is always entity 0
 		Entity* playerEntity = world.getEntities()[0];
-		PlayerInputComponent* playerInputComponent = playerEntity->getComponent<PlayerInputComponent>();
+		PlayerInputComponent* playerInputComponent = playerEntity->getComponentWriteAccess<PlayerInputComponent>(accessFlags);
 		GO_ASSERT(playerInputComponent, "Player does not have an input component");
 
 		auto& prevFrameStates = playerInputComponent->myKeyStatesPrevFrame;
@@ -31,5 +33,7 @@ namespace GO
 			prevFrameStates[currentKeyIndex] = thisFrameStates[currentKeyIndex];
 			thisFrameStates[currentKeyIndex] = sf::Keyboard::isKeyPressed(currentKey);
 		}
+
+		ComponentAccessControl::releaseAccess(accessFlags);
 	}
 }

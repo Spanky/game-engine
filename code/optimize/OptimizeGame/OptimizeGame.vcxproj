@@ -173,6 +173,7 @@
     <ClCompile Include="GO_ApplyEntitySpawnsSystem.cpp" />
     <ClCompile Include="GO_AssertMutex.cpp" />
     <ClCompile Include="GO_CalculateCombatDamageSystem.cpp" />
+    <ClCompile Include="GO_ComponentAccessControl.cpp" />
     <ClCompile Include="GO_DebugInputSystem.cpp" />
     <ClCompile Include="GO_Entity.cpp" />
     <ClCompile Include="GO_EntityComponent.cpp" />
@@ -211,6 +212,9 @@
     <ClInclude Include="GO_Assert.h" />
     <ClInclude Include="GO_AssertMutex.h" />
     <ClInclude Include="GO_CalculateCombatDamageSystem.h" />
+    <ClInclude Include="GO_ComponentAccessControl.h" />
+    <ClInclude Include="GO_ComponentAccessFlags.h" />
+    <ClInclude Include="GO_ComponentTypes.h" />
     <ClInclude Include="GO_DebugInputSystem.h" />
     <ClInclude Include="GO_Entity.h" />
     <ClInclude Include="GO_EntityComponent.h" />

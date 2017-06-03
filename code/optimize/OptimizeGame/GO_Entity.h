@@ -1,9 +1,10 @@
 #pragma once
 
+#include "GO_ComponentAccessFlags.h"
+
 namespace GO
 {
 	class EntityComponent;
-
 	
 	class Entity
 	{
@@ -17,10 +18,10 @@ namespace GO
 		ComponentType* createComponent();
 
 		template<typename ComponentType>
-		ComponentType* getComponent();
+		ComponentType* getComponentWriteAccess(const ComponentAccessFlagsType& anAccessFlags);
 
 		template<typename ComponentType>
-		const ComponentType* getComponent() const;
+		const ComponentType* getComponentReadAccess(const ComponentAccessFlagsType& anAccessFlags) const;
 
 		void destroyAllComponents();
 
@@ -56,8 +57,10 @@ namespace GO
 	}
 
 	template<typename ComponentType>
-	ComponentType* Entity::getComponent()
+	ComponentType* Entity::getComponentWriteAccess(const ComponentAccessFlagsType& anAccessFlags)
 	{
+		GO_ASSERT(anAccessFlags->hasWriteAccess(ComponentType::getComponentTypeStatic()), "Write access has not been granted for component");
+
 		for(EntityComponent* currentComponent : myComponents)
 		{
 			if(dynamic_cast<ComponentType*>(currentComponent))
@@ -70,8 +73,10 @@ namespace GO
 	}
 
 	template<typename ComponentType>
-	const ComponentType* Entity::getComponent() const
+	const ComponentType* Entity::getComponentReadAccess(const ComponentAccessFlagsType& anAccessFlags) const
 	{
+		GO_ASSERT(anAccessFlags->hasReadAccess(ComponentType::getComponentTypeStatic()), "Read access has not been granted for component");
+
 		for (EntityComponent* currentComponent : myComponents)
 		{
 			if (dynamic_cast<ComponentType*>(currentComponent))

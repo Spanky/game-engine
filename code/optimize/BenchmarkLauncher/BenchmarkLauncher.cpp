@@ -5,8 +5,18 @@
 // ----------------------------------------------------------------------------
 #include <SFML/Graphics.hpp>
 
-#include "GO_HealthComponent.h"
+#include <iostream>
+#include <array>
+#include <memory>
+#include <mutex>
+#include <algorithm>
+#include <atomic>
+
+#include <windows.h>
+
+#include "GO_Assert.h"
 #include "GO_Entity.h"
+#include "GO_HealthComponent.h"
 #include "GO_GameInstance.h"
 
 static void BM_EntityCreation(benchmark::State& aState)

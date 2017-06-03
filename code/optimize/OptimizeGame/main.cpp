@@ -1,5 +1,6 @@
 #include "StableHeaders.h"
 
+#include "GO_ComponentAccessControl.h"
 #include "GO_GameUpdateSystem.h"
 #include "GO_TaskIdentifiers.h"
 #include "GO_MovementCalculationSystem.h"
@@ -471,16 +472,19 @@ void RunGame()
 
 				{
 					PROFILER_SCOPED(&testProfiler, "Render Sprites", 0x00ffffff);
+
+					GO::ComponentAccessFlagsType accessFlags = GO::ComponentAccessControl::requestAccess(GO::ReadComponentList<>(), GO::WriteComponentList<GO::SpriteComponent>());
 					GO::World::EntityList& entityList = world.getEntities();
 					for (size_t i = 0; i < entityList.size(); i++)
 					{
 						GO::Entity& currentEntity = *entityList[i];
-						GO::SpriteComponent* spriteComponent = currentEntity.getComponent<GO::SpriteComponent>();
+						GO::SpriteComponent* spriteComponent = currentEntity.getComponentWriteAccess<GO::SpriteComponent>(accessFlags);
 						if (spriteComponent)
 						{
 							spriteComponent->render(window);
 						}
 					}
+					GO::ComponentAccessControl::releaseAccess(accessFlags);
 				}
 			}
 
@@ -542,7 +546,7 @@ void RunGame()
 
 
 			{
-				PROFILER_SCOPED(&testProfiler, "Rendering", 0xaa00aaff);
+				PROFILER_SCOPED(&testProfiler, "Render Swap", 0xaa00aaff);
 				window.display();
 			}
 

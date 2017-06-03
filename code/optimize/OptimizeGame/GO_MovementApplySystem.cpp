@@ -5,7 +5,9 @@
 #include "GO_World.h"
 #include "GO_Entity.h"
 #include "GO_MovementComponent.h"
+#include "GO_HealthComponent.h"
 #include "GO_Profiler.h"
+#include "GO_ComponentAccessControl.h"
 
 namespace
 {
@@ -35,12 +37,14 @@ namespace GO
 		GO_APIProfiler& profiler = someUpdateParams.myProfiler;
 		PROFILER_SCOPED(&profiler, "MovementApplySystem", 0xff00ffff);
 
+		ComponentAccessFlagsType accessFlags = ComponentAccessControl::requestAccess(ReadComponentList<>(), WriteComponentList<MovementComponent>());
+
 		const sf::Time deltaTime = someUpdateParams.myDeltaTime;
 
 		// Process all of our messages before we update the actual movement
 		for (const GameStateChange::MovementMessage& movementMsg : GameStateChange::ourMovementMessages)
 		{
-			GO::MovementComponent* movementComponent = movementMsg.myEntityToMove->getComponent<GO::MovementComponent>();
+			GO::MovementComponent* movementComponent = movementMsg.myEntityToMove->getComponentWriteAccess<GO::MovementComponent>(accessFlags);
 
 			GO_ASSERT(movementComponent, "Entity received a movement message but has no movement component");
 			GO_ASSERT(!movementComponent->myHasMovementQueued, "Entity already has a movement request outstanding");
@@ -57,7 +61,7 @@ namespace GO
 		for (size_t entityIndex = 0; entityIndex < entityListSize; entityIndex++)
 		{
 			GO::Entity* currentEntity = entityList[entityIndex];
-			GO::MovementComponent* movementComponent = currentEntity->getComponent<GO::MovementComponent>();
+			GO::MovementComponent* movementComponent = currentEntity->getComponentWriteAccess<GO::MovementComponent>(accessFlags);
 			if (movementComponent)
 			{
 				if (movementComponent->myHasMovementQueued)
@@ -78,5 +82,7 @@ namespace GO
 		}
 
 		GameStateChange::ourMovementMessages.clear();
+
+		ComponentAccessControl::releaseAccess(accessFlags);
 	}
 }
