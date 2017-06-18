@@ -26,4 +26,11 @@ namespace GO
 		anEntityToDestroy->destroyAllComponents();
 		delete anEntityToDestroy;
 	}
+
+	EntityRange World::getPlayers()
+	{
+		// TODO(scarroll): There is an assumption that the players are stored at index [0]
+		GO_ASSERT(myEntities.size() > 0, "There are no players yet");
+		return EntityRange(myEntities.data(), 1);
+	}
 }

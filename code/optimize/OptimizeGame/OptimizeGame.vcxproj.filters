@@ -162,6 +162,12 @@
     <ClCompile Include="GO_ComponentAccessControl.cpp">
       <Filter>Entity Systems\Threading</Filter>
     </ClCompile>
+    <ClCompile Include="GO_EntityIterator.cpp">
+      <Filter>Entity Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="GO_EntityRange.cpp">
+      <Filter>Entity Systems</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StableHeaders.h">
@@ -297,6 +303,12 @@
       <Filter>Entity Systems\Threading</Filter>
     </ClInclude>
     <ClInclude Include="GO_ComponentTypes.h">
+      <Filter>Entity Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_EntityRange.h">
+      <Filter>Entity Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_EntityIterator.h">
       <Filter>Entity Systems</Filter>
     </ClInclude>
   </ItemGroup>

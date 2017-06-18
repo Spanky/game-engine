@@ -1,5 +1,7 @@
 #pragma once
 
+#include "GO_EntityRange.h"
+
 namespace GO
 {
 	class Entity;
@@ -19,6 +21,8 @@ namespace GO
 		void destroyEntity(Entity* anEntityToDestroy);
 
 		EntityList& getEntities() { return myEntities; }
+
+		EntityRange getPlayers();
 
 	private:
 		EntityList myEntities;

@@ -177,6 +177,8 @@
     <ClCompile Include="GO_DebugInputSystem.cpp" />
     <ClCompile Include="GO_Entity.cpp" />
     <ClCompile Include="GO_EntityComponent.cpp" />
+    <ClCompile Include="GO_EntityIterator.cpp" />
+    <ClCompile Include="GO_EntityRange.cpp" />
     <ClCompile Include="GO_EventBroker.cpp" />
     <ClCompile Include="GO_GameInstance.cpp" />
     <ClCompile Include="GO_GameStateChange.cpp" />
@@ -206,6 +208,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GO_EntityIterator.h" />
+    <ClInclude Include="GO_EntityRange.h" />
     <ClInclude Include="GO_ApplyCombatDamageSystem.h" />
     <ClInclude Include="GO_ApplyEntityDeathsSystem.h" />
     <ClInclude Include="GO_ApplyEntitySpawnsSystem.h" />
