@@ -17,7 +17,7 @@ namespace GO
 	//					of submission does not necessarily matter.
 	class Task
 	{
-	private:
+	public:
 		static constexpr unsigned int InvalidTaskUniqueID = 0xffffffff;
 		static constexpr unsigned char InvalidThreadTag = 0xff;
 
@@ -129,6 +129,8 @@ namespace GO
 
 		AssertMutex myTaskListAssertMutex;
 		GO_APIProfiler* myProfiler;
+
+		bool myAreAllTasksSubmitted;
 
 	public:
 		TaskSchedulerNew(ThreadPool& aThreadPool, unsigned int aMaximumIdentifier, GO_APIProfiler* aProfiler);

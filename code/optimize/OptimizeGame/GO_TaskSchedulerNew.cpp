@@ -11,6 +11,7 @@ namespace GO
 		: myThreadPool(aThreadPool)
 		, myAreAllTasksComplete(false)
 		, myProfiler(aProfiler)
+		, myAreAllTasksSubmitted(false)
 	{
 		myTasks.resize(aMaximumIdentifier);
 		myTaskDependencies.resize(aMaximumIdentifier);
@@ -75,6 +76,7 @@ namespace GO
 	void TaskSchedulerNew::runPendingTasks()
 	{
 		std::unique_lock<std::mutex> lock(myTaskCompleteMutex);
+		myAreAllTasksSubmitted = true;
 		submitUnblockedTasks();
 
 		// TODO(scarroll): This should be a store/reset operation so the previous tag goes back on the profiler
@@ -116,9 +118,14 @@ namespace GO
 		GO_ASSERT(myAreAllTasksComplete == false, "Checking for task completion after all tasks supposedly complete");
 
 		GO::AssertMutexLock assertLock(myTaskListAssertMutex);
+		if (!myAreAllTasksSubmitted)
+		{
+			return;
+		}
+
 		for (unsigned int i = 0; i < myTaskCompletedFlags.size(); i++)
 		{
-			if (!myTaskCompletedFlags[i])
+			if (myTasks[i].getUniqueID() != Task::InvalidTaskUniqueID && !myTaskCompletedFlags[i])
 			{
 				return;
 			}
