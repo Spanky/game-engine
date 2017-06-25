@@ -34,10 +34,6 @@ static_assert(sizeof(sf::Time) == sizeof(size_t), "Time is bigger than a native 
 
 static const int Int64TextWidth = 20;
 
-static int ourGlobalFrameCounter = 0;
-static GO::Gameworks ourGameworks;
-static sf::Time deltaTime;
-
 
 void RunGameUpdateSystem(GO::GameUpdateSystem* aSystemToUpdate, GO::SystemUpdateParams& someUpdateParams)
 {
@@ -130,31 +126,21 @@ void drawThreadId(sf::RenderWindow& aWindow, const sf::Font& aFont)
 
 void RunGame()
 {
+	GO::Gameworks ourGameworks;
 	ourGameworks.myDataDirectory = "..\\..\\..\\data\\";
 	sf::err().rdbuf(ourGameworks.mySFMLOutput.rdbuf());
 
 	sf::RenderWindow window(sf::VideoMode(1600, 900), "SFML works!", sf::Style::Close | sf::Style::Titlebar);
 	//window.setVerticalSyncEnabled(true);
 
+	sf::Time deltaTime;
 	sf::Clock frameTimer;
 
 	GO::GameInstance gameInstance(window, ourGameworks);
 	GO::World world;
 
 	GO::Entity* playerEntity = world.createEntity();
-	//playerEntity->createComponent<GO::SpriteComponent>();
-	//playerEntity->createComponent<GO::MovementComponent>();
-	//playerEntity->createComponent<GO::HealthComponent>();
 	playerEntity->createComponent<GO::PlayerInputComponent>();
-
-	//for (int i = 0; i < 500; ++i)
-	//{
-	//	GO::Entity* entity = world.createEntity();
-	//	entity->createComponent<GO::SpriteComponent>();
-	//	entity->createComponent<GO::RandomMovementComponent>();
-	//	entity->createComponent<GO::MovementComponent>();
-	//	entity->createComponent<GO::HealthComponent>();
-	//}
 
 
 #if PROFILER_ENABLED
