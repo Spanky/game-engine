@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Gameplay">
+      <UniqueIdentifier>{58762c92-2b7c-434b-8094-a2702ce2d9c0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Gameplay\Entity-Component-Systems">
+      <UniqueIdentifier>{f411a285-e6bb-4920-b1da-4c2532f8c25b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Gameplay\Entity-Component-Systems\Components">
+      <UniqueIdentifier>{e7b3ac04-3f1e-40fd-8948-66e3895f8eb3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Gameplay\Entity-Component-Systems\Systems">
+      <UniqueIdentifier>{900e7bb7-430f-4614-8117-b39f05190b46}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="StableHeaders.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UpdatePlayerInputSystem.cpp">
+      <Filter>Gameplay\Entity-Component-Systems\Systems</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="main.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="StableHeaders.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UpdatePlayerInputSystem.h">
+      <Filter>Gameplay\Entity-Component-Systems\Systems</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

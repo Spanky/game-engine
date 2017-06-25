@@ -7,6 +7,7 @@ namespace GO
 		CalculateCombat,
 		CalculateMovement,
 		UpdateInput,
+		UpdatePlayerInput,
 		CalculateFinished,
 		ApplyCombatDamage,
 		ApplyEntityDeaths,

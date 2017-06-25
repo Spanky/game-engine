@@ -74,7 +74,7 @@
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>..\OptimizeGame;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <OutDir>$(SolutionDir)..\build_build\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)..\build_output\$(Platform)\$(Configuration)\BenchmarkLauncher\</IntDir>
+    <IntDir>$(SolutionDir)..\build_output\$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -83,7 +83,7 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>..\OptimizeGame;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <OutDir>$(SolutionDir)..\build_build\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)..\build_output\$(Platform)\$(Configuration)\BenchmarkLauncher\</IntDir>
+    <IntDir>$(SolutionDir)..\build_output\$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -103,7 +103,7 @@
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>OptimizeGame.lib;Shlwapi.lib;..\..\..\libs\google-benchmark\libs\benchmark.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>OptimizeEngine.lib;Shlwapi.lib;..\..\..\libs\google-benchmark\libs\benchmark.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\build_build\$(PlatformName)\$(ConfigurationName)</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
@@ -133,7 +133,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>OptimizeGame.lib;Shlwapi.lib;..\..\..\libs\google-benchmark\libs\benchmark-d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>OptimizeEngine.lib;Shlwapi.lib;..\..\..\libs\google-benchmark\libs\benchmark-d.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\build_build\$(PlatformName)\$(ConfigurationName)</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>

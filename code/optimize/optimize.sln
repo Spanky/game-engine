@@ -1,13 +1,14 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26228.12
+VisualStudioVersion = 15.0.26403.7
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OptimizeGame", "OptimizeGame\OptimizeGame.vcxproj", "{C864E592-7634-4B8D-9339-4CA00F0BB8F0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OptimizeEngine", "OptimizeGame\OptimizeGame.vcxproj", "{C864E592-7634-4B8D-9339-4CA00F0BB8F0}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GameLauncher", "GameLauncher\GameLauncher.vcxproj", "{5E761DF9-ED18-45AF-A3E6-DEB151B84F5A}"
 	ProjectSection(ProjectDependencies) = postProject
 		{C864E592-7634-4B8D-9339-4CA00F0BB8F0} = {C864E592-7634-4B8D-9339-4CA00F0BB8F0}
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57} = {CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Executables", "Executables", "{2527D258-30FF-4A0A-82DD-4739BFD49260}"
@@ -16,6 +17,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BenchmarkLauncher", "Benchm
 	ProjectSection(ProjectDependencies) = postProject
 		{C864E592-7634-4B8D-9339-4CA00F0BB8F0} = {C864E592-7634-4B8D-9339-4CA00F0BB8F0}
 	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{D644301E-45AF-4D76-9730-A7A7A550B7F9}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Bricks", "Bricks\Bricks.vcxproj", "{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -49,6 +54,14 @@ Global
 		{FC8AF903-F607-4ECB-A244-08BE3FB682FD}.Release|x64.Build.0 = Release|x64
 		{FC8AF903-F607-4ECB-A244-08BE3FB682FD}.Release|x86.ActiveCfg = Release|Win32
 		{FC8AF903-F607-4ECB-A244-08BE3FB682FD}.Release|x86.Build.0 = Release|Win32
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}.Debug|x64.ActiveCfg = Debug|x64
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}.Debug|x64.Build.0 = Debug|x64
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}.Debug|x86.ActiveCfg = Debug|Win32
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}.Debug|x86.Build.0 = Debug|Win32
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}.Release|x64.ActiveCfg = Release|x64
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}.Release|x64.Build.0 = Release|x64
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}.Release|x86.ActiveCfg = Release|Win32
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -56,5 +69,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{5E761DF9-ED18-45AF-A3E6-DEB151B84F5A} = {2527D258-30FF-4A0A-82DD-4739BFD49260}
 		{FC8AF903-F607-4ECB-A244-08BE3FB682FD} = {2527D258-30FF-4A0A-82DD-4739BFD49260}
+		{CA6FAFFA-90E1-4250-A943-3D11F1AC8A57} = {D644301E-45AF-4D76-9730-A7A7A550B7F9}
 	EndGlobalSection
 EndGlobal

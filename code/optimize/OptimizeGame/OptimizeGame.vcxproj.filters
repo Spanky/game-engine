@@ -72,9 +72,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="StableHeaders.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -257,9 +254,6 @@
     <ClInclude Include="GO_MovementApplySystem.h">
       <Filter>Entity Systems\Systems</Filter>
     </ClInclude>
-    <ClInclude Include="main.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="GO_TaskSchedulerNew.h">
       <Filter>Threading\Task System</Filter>
     </ClInclude>
@@ -268,9 +262,6 @@
     </ClInclude>
     <ClInclude Include="GO_TaskIdentifiers.h">
       <Filter>Entity Systems\Systems</Filter>
-    </ClInclude>
-    <ClInclude Include="GO_EventBroker.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GO_CalculateCombatDamageSystem.h">
       <Filter>Entity Systems\Systems</Filter>
@@ -304,6 +295,9 @@
     </ClInclude>
     <ClInclude Include="GO_ComponentTypes.h">
       <Filter>Entity Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="GO_EventBroker.h">
+      <Filter>World</Filter>
     </ClInclude>
     <ClInclude Include="GO_EntityRange.h">
       <Filter>Entity Systems</Filter>
